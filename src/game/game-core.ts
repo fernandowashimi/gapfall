@@ -5,7 +5,7 @@ export const COLUMN_COUNT = 4;
 export const BLOCK_WIDTH = GAME_WIDTH / COLUMN_COUNT;
 export const BLOCK_HEIGHT = 45;
 export const FALL_SPEED = BLOCK_HEIGHT;
-export const SHOT_SPEED = BLOCK_HEIGHT * 12;
+export const SHOT_SPEED = BLOCK_HEIGHT * 24;
 
 export type Column = 0 | 1 | 2 | 3;
 export type GamePhase = "preparing" | "playing" | "paused" | "game-over";
