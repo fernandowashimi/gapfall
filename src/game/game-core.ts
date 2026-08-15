@@ -4,8 +4,19 @@ export const PLAYFIELD_HEIGHT = 720;
 export const COLUMN_COUNT = 4;
 export const BLOCK_WIDTH = GAME_WIDTH / COLUMN_COUNT;
 export const BLOCK_HEIGHT = 45;
-export const FALL_SPEED = BLOCK_HEIGHT;
 export const SHOT_SPEED = BLOCK_HEIGHT * 24;
+
+export interface FallSpeedConfig {
+  baseFallSpeed: number;
+  speedCapMultiplier: number;
+  rampDuration: number;
+}
+
+export const DEFAULT_FALL_SPEED: FallSpeedConfig = {
+  baseFallSpeed: 1,
+  speedCapMultiplier: 3,
+  rampDuration: 60,
+};
 
 export type Column = 0 | 1 | 2 | 3;
 export type GamePhase = "preparing" | "playing" | "paused" | "game-over";
@@ -29,6 +40,8 @@ export interface GameState {
   score: number;
   preparationRemaining: number;
   spawnElapsed: number;
+  playingTime: number;
+  fallSpeedConfig: FallSpeedConfig;
   nextId: number;
   previousGap: Column | null;
   consecutiveGapCount: number;
@@ -38,7 +51,10 @@ type Random = () => number;
 
 const preparationSeconds = 3;
 
-export function createGame(random: Random = Math.random): GameState {
+export function createGame(
+  random: Random = Math.random,
+  fallSpeedConfig: Partial<FallSpeedConfig> = {},
+): GameState {
   const [firstRow, previousGap, consecutiveGapCount] = createGeneratedRow(
     1,
     -BLOCK_HEIGHT,
@@ -54,6 +70,8 @@ export function createGame(random: Random = Math.random): GameState {
     score: 0,
     preparationRemaining: preparationSeconds,
     spawnElapsed: 0,
+    playingTime: 0,
+    fallSpeedConfig: resolveFallSpeedConfig(fallSpeedConfig),
     nextId: 2,
     previousGap,
     consecutiveGapCount,
@@ -109,9 +127,14 @@ export function advanceGame(
 
   // Clear lines completed on a previous frame so the filled gap is visible for at least one tick.
   const afterDetonation = detonateEligibleRows(state);
+  const displacement = fallDisplacement(
+    afterDetonation.playingTime,
+    elapsedSeconds,
+    afterDetonation.fallSpeedConfig,
+  );
   const shiftedRows = afterDetonation.rows.map((row) => ({
     ...row,
-    y: row.y + FALL_SPEED * elapsedSeconds,
+    y: row.y + displacement,
   }));
   const movedShots = afterDetonation.shots.map((shot) => ({
     ...shot,
@@ -122,13 +145,14 @@ export function advanceGame(
     rows: shiftedRows,
     shots: movedShots,
   });
-  const afterSpawning = spawnRows(afterCollisions, elapsedSeconds, random);
+  const afterSpawning = spawnRows(afterCollisions, displacement, random);
   const lost = afterSpawning.rows.some(
     (row) => row.y + BLOCK_HEIGHT >= PLAYFIELD_HEIGHT,
   );
 
   return {
     ...afterSpawning,
+    playingTime: afterSpawning.playingTime + elapsedSeconds,
     phase: lost ? "game-over" : "playing",
   };
 }
@@ -235,10 +259,10 @@ function removeEligibleRows(rows: readonly GameRow[]): {
 
 function spawnRows(
   state: GameState,
-  elapsedSeconds: number,
+  displacement: number,
   random: Random,
 ): GameState {
-  const accumulated = state.spawnElapsed + elapsedSeconds;
+  const accumulated = state.spawnElapsed + displacement / BLOCK_HEIGHT;
   const spawns = Math.floor(accumulated);
   const spawnElapsed = accumulated - spawns;
   let nextId = state.nextId;
@@ -269,6 +293,39 @@ function spawnRows(
     previousGap,
     consecutiveGapCount,
   };
+}
+
+function resolveFallSpeedConfig(
+  config: Partial<FallSpeedConfig>,
+): FallSpeedConfig {
+  return {
+    baseFallSpeed: config.baseFallSpeed ?? DEFAULT_FALL_SPEED.baseFallSpeed,
+    speedCapMultiplier:
+      config.speedCapMultiplier ?? DEFAULT_FALL_SPEED.speedCapMultiplier,
+    rampDuration: config.rampDuration ?? DEFAULT_FALL_SPEED.rampDuration,
+  };
+}
+
+function fallDisplacement(
+  playingTime: number,
+  elapsedSeconds: number,
+  config: FallSpeedConfig,
+): number {
+  const base = config.baseFallSpeed * BLOCK_HEIGHT;
+  const cap = base * config.speedCapMultiplier;
+  const rampDuration = config.rampDuration;
+
+  if (playingTime >= rampDuration) {
+    return cap * elapsedSeconds;
+  }
+
+  const slope = (cap - base) / rampDuration;
+  const linearSeconds = Math.min(elapsedSeconds, rampDuration - playingTime);
+  const linear =
+    (base + slope * playingTime) * linearSeconds +
+    (slope * linearSeconds * linearSeconds) / 2;
+  const cappedSeconds = elapsedSeconds - linearSeconds;
+  return linear + cap * cappedSeconds;
 }
 
 function createGeneratedRow(

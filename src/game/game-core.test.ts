@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { advanceGame, BLOCK_HEIGHT, createGame, launchBlock, startGame } from './game-core'
+import {
+  advanceGame,
+  BLOCK_HEIGHT,
+  createGame,
+  launchBlock,
+  pauseGame,
+  PLAYFIELD_HEIGHT,
+  resumeGame,
+  SHOT_SPEED,
+  startGame,
+} from './game-core'
 
 describe('game core', () => {
   it('removes the lowest generated row when its empty slot is hit', () => {
-    let game = startGame(createGame(() => 0.3))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0.3)
     game = advanceGame(game, 0.001, () => 0.3)
@@ -13,7 +23,7 @@ describe('game core', () => {
   })
 
   it('keeps a completed line visible for one frame before detonating', () => {
-    let game = startGame(createGame(() => 0.3))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0.3)
 
@@ -27,21 +37,21 @@ describe('game core', () => {
   })
 
   it('keeps generated rows touching while the board moves continuously', () => {
-    const game = advanceGame(startGame(createGame(() => 0)), 2, () => 0)
+    const game = advanceGame(startGame(createGameAtBaseFallSpeed(() => 0)), 2, () => 0)
     const positions = game.rows.map((row) => row.y).sort((a, b) => b - a)
 
     expect(positions).toEqual([BLOCK_HEIGHT, 0, -BLOCK_HEIGHT])
   })
 
   it('spawns new rows above the playfield so they scroll into view', () => {
-    const game = advanceGame(startGame(createGame(() => 0)), 1, () => 0)
+    const game = advanceGame(startGame(createGameAtBaseFallSpeed(() => 0)), 1, () => 0)
     const newest = Math.min(...game.rows.map((row) => row.y))
 
     expect(newest).toBe(-BLOCK_HEIGHT)
   })
 
   it('requires two shots to clear a consecutive pair with the same empty column', () => {
-    let game = startGame(createGame(() => 0.3))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
     game = advanceGame(game, 1, () => 0.3)
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0.8)
@@ -61,7 +71,7 @@ describe('game core', () => {
   })
 
   it('gives player-created rows unique identities before generating subsequent rows', () => {
-    let game = startGame(createGame(() => 0))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0)
     game = advanceGame(game, 1, () => 0)
@@ -70,7 +80,7 @@ describe('game core', () => {
   })
 
   it('only lets a shot pass through an immediately adjacent matching gap', () => {
-    let game = startGame(createGame(() => 0))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = {
       ...game,
       rows: [
@@ -92,7 +102,7 @@ describe('game core', () => {
   })
 
   it('travels through the lower gap before filling a consecutive upper gap', () => {
-    let game = startGame(createGame(() => 0))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = {
       ...game,
       rows: [
@@ -116,7 +126,7 @@ describe('game core', () => {
   })
 
   it('fills the topmost gap in an arbitrarily long consecutive empty column', () => {
-    let game = startGame(createGame(() => 0))
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = {
       ...game,
       rows: [
@@ -146,7 +156,208 @@ describe('game core', () => {
     expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(false)
     expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(false)
   })
+
+  it('starts a round at playing time zero', () => {
+    const game = createGame(() => 0)
+
+    expect(game.playingTime).toBe(0)
+  })
+
+  it('does not advance playing time during preparation', () => {
+    const game = advanceGame(createGame(() => 0), 2, () => 0)
+
+    expect(game.phase).toBe('preparing')
+    expect(game.playingTime).toBe(0)
+  })
+
+  it('counts leftover preparation into playing time', () => {
+    const game = advanceGame(createGame(() => 0), 3.25, () => 0)
+
+    expect(game.phase).toBe('playing')
+    expect(game.playingTime).toBe(0.25)
+  })
+
+  it('does not advance playing time while paused', () => {
+    let game = startGame(createGame(() => 0))
+    game = advanceGame(game, 1, () => 0)
+    game = pauseGame(game)
+    game = advanceGame(game, 5, () => 0)
+
+    expect(game.playingTime).toBe(1)
+  })
+
+  it('does not advance playing time after game-over', () => {
+    let game = startGame(createGame(() => 0))
+    game = {
+      ...game,
+      rows: [{ id: 1, y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT, cells: [true, false, true, true] }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    const timeAtLoss = game.playingTime
+    game = advanceGame(game, 5, () => 0)
+
+    expect(game.phase).toBe('game-over')
+    expect(game.playingTime).toBe(timeAtLoss)
+  })
+
+  it('does not add playing time when starting a round', () => {
+    const started = startGame(createGame(() => 0))
+
+    expect(started.playingTime).toBe(0)
+    expect(started.phase).toBe('playing')
+  })
+
+  it('does not add playing time when resuming', () => {
+    let game = startGame(createGame(() => 0))
+    game = advanceGame(game, 1, () => 0)
+    game = pauseGame(game)
+    game = resumeGame(game)
+
+    expect(game.playingTime).toBe(1)
+    expect(game.phase).toBe('playing')
+  })
+
+  it('falls at one block-height per second at playing time zero', () => {
+    const travel = travelAfterPlayingTime(0, 0.001)
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 0.001)
+  })
+
+  it('falls at two block-heights per second at thirty seconds', () => {
+    const travel = travelAfterPlayingTime(30, 0.001)
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 2 * 0.001)
+  })
+
+  it('falls at three block-heights per second at sixty seconds', () => {
+    const travel = travelAfterPlayingTime(60, 0.001)
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 3 * 0.001)
+  })
+
+  it('holds the speed cap after the ramp duration', () => {
+    const travel = travelAfterPlayingTime(90, 0.001)
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 3 * 0.001)
+  })
+
+  it('keeps generated rows packed while fall speed ramps', () => {
+    const game = advanceGame(startGame(createGame(() => 0)), 8, () => 0)
+    const positions = game.rows.map((row) => row.y).sort((a, b) => b - a)
+
+    expect(positions[0]).toBeGreaterThan(BLOCK_HEIGHT)
+    for (let index = 0; index < positions.length - 1; index += 1) {
+      expect(positions[index] - positions[index + 1]).toBeCloseTo(BLOCK_HEIGHT)
+    }
+  })
+
+  it('matches one large playing-time step with many small steps', () => {
+    const random = () => 0
+    const large = advanceGame(startGame(createGame(random)), 4, random)
+    let small = startGame(createGame(random))
+    for (let step = 0; step < 8; step += 1) {
+      small = advanceGame(small, 0.5, random)
+    }
+
+    expect(small.playingTime).toBeCloseTo(large.playingTime)
+    const largePositions = large.rows.map((row) => row.y).sort((a, b) => b - a)
+    const smallPositions = small.rows.map((row) => row.y).sort((a, b) => b - a)
+    expect(smallPositions).toHaveLength(largePositions.length)
+    for (let index = 0; index < largePositions.length; index += 1) {
+      expect(smallPositions[index]).toBeCloseTo(largePositions[index], 5)
+    }
+  })
+
+  it('matches one step that crosses the speed cap with many small steps', () => {
+    const large = travelStateAfter(59.5, 1)
+    let small = travelStateAfter(59.5, 0.5)
+    small = advanceGame(small, 0.5, () => 0)
+
+    expect(small.playingTime).toBeCloseTo(large.playingTime)
+    expect(small.rows[0].y).toBeCloseTo(large.rows[0].y, 5)
+  })
+
+  it('keeps shot speed constant at the speed cap', () => {
+    let game = startGame(createGame(() => 0))
+    game = {
+      ...game,
+      playingTime: 60,
+      rows: [{ id: 1, y: 0, cells: [true, false, true, true] }],
+      shots: [{ id: 99, column: 1, y: 400 }],
+    }
+    game = advanceGame(game, 0.1, () => 0)
+
+    expect(game.shots[0]?.y).toBeCloseTo(400 - SHOT_SPEED * 0.1)
+  })
+
+  it('uses injected speed cap and ramp duration', () => {
+    const travel = travelAfterPlayingTime(10, 0.001, {
+      speedCapMultiplier: 5,
+      rampDuration: 10,
+    })
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 5 * 0.001)
+  })
+
+  it('stores fall-speed knobs on the game state', () => {
+    const game = createGame(() => 0)
+
+    expect(game.fallSpeedConfig).toEqual({
+      baseFallSpeed: 1,
+      speedCapMultiplier: 3,
+      rampDuration: 60,
+    })
+  })
+
+  it('still scores one for a single line clear while fall speed ramps', () => {
+    let game = startGame(createGame(() => 0.3))
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.3)
+    game = advanceGame(game, 0.001, () => 0.3)
+
+    expect(game.score).toBe(1)
+  })
+
+  it('still scores three for a double cascade while fall speed ramps', () => {
+    let game = startGame(createGame(() => 0.3))
+    game = advanceGame(game, 1, () => 0.3)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    game = advanceGame(game, 0.001, () => 0.8)
+
+    expect(game.score).toBe(3)
+  })
 })
+
+function createGameAtBaseFallSpeed(random: () => number) {
+  return createGame(random, { speedCapMultiplier: 1 })
+}
+
+function travelStateAfter(
+  playingTime: number,
+  elapsedSeconds: number,
+  fallSpeedConfig: Parameters<typeof createGame>[1] = {},
+) {
+  let game = startGame(createGame(() => 0, fallSpeedConfig))
+  game = {
+    ...game,
+    playingTime,
+    rows: [{ id: 1, y: 100, cells: [true, false, true, true] }],
+  }
+  return advanceGame(game, elapsedSeconds, () => 0)
+}
+
+function travelAfterPlayingTime(
+  playingTime: number,
+  elapsedSeconds: number,
+  fallSpeedConfig: Parameters<typeof createGame>[1] = {},
+): number {
+  const before = 100
+  const game = travelStateAfter(playingTime, elapsedSeconds, fallSpeedConfig)
+  return game.rows[0].y - before
+}
 
 function lowestFilledBottom(game: { rows: readonly { y: number }[] }): number {
   const lowestY = Math.max(...game.rows.map((row) => row.y))
