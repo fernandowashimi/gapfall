@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Orbitron:wght@700;900&display=swap');
+
+:root {
+  color: #fff;
+  background: #070b16;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; min-width: 320px; min-height: 100dvh; }
+
+button { font: inherit; }
+
+.app-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  gap: 16px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: radial-gradient(circle at top, #172b59 0, #070b16 52%);
+}
+
+.game-frame {
+  position: relative;
+  width: min(100%, 450px, calc((100dvh - 84px) * 0.45));
+  aspect-ratio: 9 / 20;
+  overflow: hidden;
+  border: 1px solid rgba(147, 197, 253, 0.48);
+  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.14), 0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+.game-canvas { display: block; width: 100%; height: 100%; touch-action: manipulation; cursor: crosshair; }
+
+.game-hud {
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 18px 16px;
+  pointer-events: none;
+  text-shadow: 0 2px 12px #000;
+}
+
+.eyebrow { margin: 0 0 4px; color: #bbf7d0; font-size: 11px; font-weight: 700; letter-spacing: 0.11em; }
+.game-hud h1 { margin: 0; font: 700 16px/1 'Orbitron', sans-serif; }
+.game-hud h1 span { color: #fff; font-size: 24px; }
+.key-hint { color: #dbeafe; font-size: 12px; letter-spacing: 0.12em; }
+
+.game-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px;
+  text-align: center;
+  background: rgba(7, 11, 22, 0.82);
+  backdrop-filter: blur(4px);
+}
+
+.game-overlay strong { font: 900 68px/1 'Orbitron', sans-serif; color: #22c55e; }
+.game-overlay span { color: #dbeafe; }
+.game-overlay button {
+  min-height: 48px;
+  margin-top: 18px;
+  padding: 0 20px;
+  border: 1px solid #bbf7d0;
+  border-radius: 0;
+  color: #07110b;
+  background: #22c55e;
+  cursor: pointer;
+  transition: transform 160ms ease-out, filter 160ms ease-out;
+}
+.game-overlay button:hover, .game-overlay button:focus-visible { filter: brightness(1.1); transform: translateY(-2px); outline: 3px solid #fff; outline-offset: 3px; }
+.instructions { margin: 0; color: #cbd5e1; font-size: 12px; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) { .game-overlay button { transition: none; } }
