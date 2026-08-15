@@ -14,8 +14,8 @@ export interface FallSpeedConfig {
 
 export const DEFAULT_FALL_SPEED: FallSpeedConfig = {
   baseFallSpeed: 1,
-  speedCapMultiplier: 3,
-  rampDuration: 60,
+  speedCapMultiplier: 6,
+  rampDuration: 120,
 };
 
 export type Column = 0 | 1 | 2 | 3;
