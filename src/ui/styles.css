@@ -10,10 +10,17 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100dvh;
+  overflow: hidden;
 }
 
 button {
@@ -22,6 +29,7 @@ button {
 
 .app-shell {
   min-height: 100dvh;
+  height: 100dvh;
   display: grid;
   place-items: center;
   padding: max(16px, env(safe-area-inset-top)) 16px
@@ -31,13 +39,34 @@ button {
 
 .game-frame {
   position: relative;
-  width: min(100%, 450px, calc((100dvh - 48px) * 0.45));
+  width: min(100%, 450px, calc((100dvh - 48px) * 9 / 20));
   aspect-ratio: 9 / 20;
   overflow: hidden;
   border: 1px solid rgba(147, 197, 253, 0.48);
   box-shadow:
     0 0 0 5px rgba(37, 99, 235, 0.14),
     0 24px 80px rgba(0, 0, 0, 0.55);
+}
+
+/* Fill the viewport on phones; keep 9:20 and respect notches. */
+@media (max-width: 540px) {
+  .app-shell {
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+
+  .game-frame {
+    --frame-max-height: calc(
+      100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+    );
+    --frame-max-width: calc(
+      100dvw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+    );
+    width: min(var(--frame-max-width), calc(var(--frame-max-height) * 9 / 20));
+    max-height: var(--frame-max-height);
+    border-width: 0;
+    box-shadow: none;
+  }
 }
 
 .game-canvas {
