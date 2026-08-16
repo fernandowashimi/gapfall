@@ -1,22 +1,22 @@
-import { useState } from "react";
-import type { GameState } from "../game/game-core";
-import { createGame } from "../game/game-core";
-import { GameCanvas } from "./GameCanvas";
+import { useState } from 'react'
+import type { GameState } from '../game/game-core'
+import { createGame } from '../game/game-core'
+import { GameCanvas } from './GameCanvas'
 
 export default function App() {
-  const [round, setRound] = useState(0);
-  const [resumeRequest, setResumeRequest] = useState(0);
-  const [game, setGame] = useState<GameState>(() => createGame());
-  const [highScore, setHighScore] = useState(readHighScore);
+  const [round, setRound] = useState(0)
+  const [resumeRequest, setResumeRequest] = useState(0)
+  const [game, setGame] = useState<GameState>(() => createGame())
+  const [highScore, setHighScore] = useState(readHighScore)
 
   const handleGameChange = (nextGame: GameState) => {
-    setGame(nextGame);
+    setGame(nextGame)
     setHighScore((currentHighScore) => {
-      if (nextGame.score <= currentHighScore) return currentHighScore;
-      localStorage.setItem("gapfall:high-score", String(nextGame.score));
-      return nextGame.score;
-    });
-  };
+      if (nextGame.score <= currentHighScore) return currentHighScore
+      localStorage.setItem('gapfall:high-score', String(nextGame.score))
+      return nextGame.score
+    })
+  }
 
   return (
     <main className="app-shell">
@@ -37,7 +37,7 @@ export default function App() {
           onGameChange={handleGameChange}
           resumeRequest={resumeRequest}
         />
-        {game.phase === "game-over" && (
+        {game.phase === 'game-over' && (
           <div
             className="game-overlay"
             role="dialog"
@@ -56,7 +56,7 @@ export default function App() {
             </button>
           </div>
         )}
-        {game.phase === "paused" && (
+        {game.phase === 'paused' && (
           <div className="game-overlay" role="status" aria-live="polite">
             <p className="eyebrow">PAUSADO</p>
             <span>A partida foi pausada.</span>
@@ -73,11 +73,11 @@ export default function App() {
         Toque em uma coluna ou pressione A, S, K ou L para lançar.
       </p>
     </main>
-  );
+  )
 }
 
 function readHighScore(): number {
-  const stored = localStorage.getItem("gapfall:high-score");
-  const value = Number(stored);
-  return Number.isFinite(value) && value >= 0 ? value : 0;
+  const stored = localStorage.getItem('gapfall:high-score')
+  const value = Number(stored)
+  return Number.isFinite(value) && value >= 0 ? value : 0
 }

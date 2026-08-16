@@ -29,11 +29,19 @@ export function loadGameSprites(): Promise<GameSprites> {
     loadImage(tntBlockUrl),
     loadImage(playfieldBackgroundUrl),
     loadImage(launcherPanelUrl),
-  ]).then(([stoneBlock, stoneBlockVariant, tntBlock, playfieldBackground, launcherPanel]) => ({
-    stoneBlock,
-    stoneBlockVariant,
-    tntBlock,
-    playfieldBackground,
-    launcherPanel,
-  }))
+  ]).then(
+    ([
+      stoneBlock,
+      stoneBlockVariant,
+      tntBlock,
+      playfieldBackground,
+      launcherPanel,
+    ]) => ({
+      stoneBlock,
+      stoneBlockVariant,
+      tntBlock,
+      playfieldBackground,
+      launcherPanel,
+    }),
+  )
 }

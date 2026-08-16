@@ -37,14 +37,22 @@ describe('game core', () => {
   })
 
   it('keeps generated rows touching while the board moves continuously', () => {
-    const game = advanceGame(startGame(createGameAtBaseFallSpeed(() => 0)), 2, () => 0)
+    const game = advanceGame(
+      startGame(createGameAtBaseFallSpeed(() => 0)),
+      2,
+      () => 0,
+    )
     const positions = game.rows.map((row) => row.y).sort((a, b) => b - a)
 
     expect(positions).toEqual([BLOCK_HEIGHT, 0, -BLOCK_HEIGHT])
   })
 
   it('spawns new rows above the playfield so they scroll into view', () => {
-    const game = advanceGame(startGame(createGameAtBaseFallSpeed(() => 0)), 1, () => 0)
+    const game = advanceGame(
+      startGame(createGameAtBaseFallSpeed(() => 0)),
+      1,
+      () => 0,
+    )
     const newest = Math.min(...game.rows.map((row) => row.y))
 
     expect(newest).toBe(-BLOCK_HEIGHT)
@@ -93,7 +101,9 @@ describe('game core', () => {
     game = advanceGame(game, 1.5, () => 0)
 
     expect(game.score).toBe(0)
-    expect(game.rows.find((row) => row.id === 1)?.cells.every(Boolean)).toBe(true)
+    expect(game.rows.find((row) => row.id === 1)?.cells.every(Boolean)).toBe(
+      true,
+    )
 
     game = advanceGame(game, 0.001, () => 0)
 
@@ -141,15 +151,27 @@ describe('game core', () => {
     game = advanceGame(game, 0.001, () => 0)
 
     expect(game.shots).toHaveLength(1)
-    expect(game.rows.map((row) => row.cells[1])).toEqual([false, false, false, false])
+    expect(game.rows.map((row) => row.cells[1])).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ])
 
     game = advanceGame(game, 0.4, () => 0)
 
     expect(game.shots).toHaveLength(0)
     expect(game.rows.find((row) => row.id === 4)?.cells[1]).toBe(true)
-    expect(game.rows.filter((row) => row.id !== 4).every((row) => row.cells[1] === false)).toBe(true)
+    expect(
+      game.rows
+        .filter((row) => row.id !== 4)
+        .every((row) => row.cells[1] === false),
+    ).toBe(true)
 
-    game = { ...game, shots: [{ id: 100, column: 1, y: lowestFilledBottom(game) }] }
+    game = {
+      ...game,
+      shots: [{ id: 100, column: 1, y: lowestFilledBottom(game) }],
+    }
     game = advanceGame(game, 0.5, () => 0)
 
     expect(game.rows.find((row) => row.id === 3)?.cells[1]).toBe(true)
@@ -164,14 +186,22 @@ describe('game core', () => {
   })
 
   it('does not advance playing time during preparation', () => {
-    const game = advanceGame(createGame(() => 0), 2, () => 0)
+    const game = advanceGame(
+      createGame(() => 0),
+      2,
+      () => 0,
+    )
 
     expect(game.phase).toBe('preparing')
     expect(game.playingTime).toBe(0)
   })
 
   it('counts leftover preparation into playing time', () => {
-    const game = advanceGame(createGame(() => 0), 3.25, () => 0)
+    const game = advanceGame(
+      createGame(() => 0),
+      3.25,
+      () => 0,
+    )
 
     expect(game.phase).toBe('playing')
     expect(game.playingTime).toBe(0.25)
@@ -190,7 +220,13 @@ describe('game core', () => {
     let game = startGame(createGame(() => 0))
     game = {
       ...game,
-      rows: [{ id: 1, y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT, cells: [true, false, true, true] }],
+      rows: [
+        {
+          id: 1,
+          y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT,
+          cells: [true, false, true, true],
+        },
+      ],
     }
     game = advanceGame(game, 0.001, () => 0)
     const timeAtLoss = game.playingTime

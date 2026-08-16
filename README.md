@@ -43,12 +43,15 @@ src/
 
 ## Scripts
 
-| Command            | Purpose                                  |
-| ------------------ | ---------------------------------------- |
-| `npm run dev`      | Local Vite dev server                    |
-| `npm run build`    | Typecheck and production build → `dist/` |
-| `npm test`         | Vitest in watch mode                     |
-| `npm run test:run` | Vitest once (CI-friendly)                |
+| Command                | Purpose                                  |
+| ---------------------- | ---------------------------------------- |
+| `npm run dev`          | Local Vite dev server                    |
+| `npm run build`        | Typecheck and production build → `dist/` |
+| `npm run lint`         | ESLint over the project                  |
+| `npm run format`       | Format the project with Prettier         |
+| `npm run format:check` | Check Prettier formatting without writes |
+| `npm test`             | Vitest in watch mode                     |
+| `npm run test:run`     | Vitest once (CI-friendly)                |
 
 ## Requirements
 

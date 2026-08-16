@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import type { PointerEvent } from 'react'
 import {
   advanceGame,
@@ -27,10 +27,8 @@ const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
 export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameRef = useRef<GameState>(createGame())
-  const callbackRef = useRef(onGameChange)
   const spritesRef = useRef<GameSprites | null>(null)
-
-  callbackRef.current = onGameChange
+  const notifyGameChange = useEffectEvent(onGameChange)
 
   useEffect(() => {
     let cancelled = false
@@ -45,7 +43,7 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
   }, [])
 
   useEffect(() => {
-    callbackRef.current(gameRef.current)
+    notifyGameChange(gameRef.current)
     const canvas = canvasRef.current
     const context = canvas?.getContext('2d')
     if (!context) return
@@ -62,7 +60,8 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
       const next = advanceGame(before, delta)
       gameRef.current = next
       drawGame(context, next, spritesRef.current)
-      if (before.score !== next.score || before.phase !== next.phase) callbackRef.current(next)
+      if (before.score !== next.score || before.phase !== next.phase)
+        notifyGameChange(next)
       frameId = requestAnimationFrame(tick)
     }
 
@@ -73,7 +72,7 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
 
   useEffect(() => {
     gameRef.current = resumeGame(gameRef.current)
-    callbackRef.current(gameRef.current)
+    notifyGameChange(gameRef.current)
   }, [resumeRequest])
 
   useEffect(() => {
@@ -85,11 +84,11 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
     }
     const handleVisibility = () => {
       if (document.hidden) gameRef.current = pauseGame(gameRef.current)
-      callbackRef.current(gameRef.current)
+      notifyGameChange(gameRef.current)
     }
     const handleBlur = () => {
       gameRef.current = pauseGame(gameRef.current)
-      callbackRef.current(gameRef.current)
+      notifyGameChange(gameRef.current)
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -105,7 +104,10 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
   const handlePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = (event.clientX - bounds.left) * (GAME_WIDTH / bounds.width)
-    const column = Math.min(COLUMN_COUNT - 1, Math.max(0, Math.floor(x / BLOCK_WIDTH))) as Column
+    const column = Math.min(
+      COLUMN_COUNT - 1,
+      Math.max(0, Math.floor(x / BLOCK_WIDTH)),
+    ) as Column
     gameRef.current = launchBlock(gameRef.current, column)
   }
 
@@ -121,11 +123,21 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
   )
 }
 
-function drawGame(context: CanvasRenderingContext2D, game: GameState, sprites: GameSprites | null) {
+function drawGame(
+  context: CanvasRenderingContext2D,
+  game: GameState,
+  sprites: GameSprites | null,
+) {
   context.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
 
   if (sprites) {
-    context.drawImage(sprites.playfieldBackground, 0, 0, GAME_WIDTH, PLAYFIELD_HEIGHT)
+    context.drawImage(
+      sprites.playfieldBackground,
+      0,
+      0,
+      GAME_WIDTH,
+      PLAYFIELD_HEIGHT,
+    )
   } else {
     const background = context.createLinearGradient(0, 0, 0, GAME_HEIGHT)
     background.addColorStop(0, '#111d3a')
@@ -137,9 +149,18 @@ function drawGame(context: CanvasRenderingContext2D, game: GameState, sprites: G
   if (!sprites) drawGrid(context)
 
   for (const row of game.rows) drawRow(context, row, sprites)
-  for (const shot of game.shots) drawSprite(context, sprites?.tntBlock ?? null, shot.column, shot.y, '#22c55e', '#bbf7d0')
+  for (const shot of game.shots)
+    drawSprite(
+      context,
+      sprites?.tntBlock ?? null,
+      shot.column,
+      shot.y,
+      '#22c55e',
+      '#bbf7d0',
+    )
   drawLauncher(context, sprites)
-  if (game.phase === 'preparing') drawPreparation(context, game.preparationRemaining)
+  if (game.phase === 'preparing')
+    drawPreparation(context, game.preparationRemaining)
 }
 
 function drawGrid(context: CanvasRenderingContext2D) {
@@ -156,11 +177,25 @@ function drawGrid(context: CanvasRenderingContext2D) {
   context.strokeRect(0.5, 0.5, GAME_WIDTH - 1, PLAYFIELD_HEIGHT - 1)
 }
 
-function drawRow(context: CanvasRenderingContext2D, row: GameState['rows'][number], sprites: GameSprites | null) {
+function drawRow(
+  context: CanvasRenderingContext2D,
+  row: GameState['rows'][number],
+  sprites: GameSprites | null,
+) {
   row.cells.forEach((filled, column) => {
     if (!filled) return
-    const stoneSprite = (row.id + column) % 2 === 0 ? sprites?.stoneBlock : sprites?.stoneBlockVariant
-    drawSprite(context, stoneSprite ?? sprites?.stoneBlock ?? null, column, row.y, '#2563eb', '#93c5fd')
+    const stoneSprite =
+      (row.id + column) % 2 === 0
+        ? sprites?.stoneBlock
+        : sprites?.stoneBlockVariant
+    drawSprite(
+      context,
+      stoneSprite ?? sprites?.stoneBlock ?? null,
+      column,
+      row.y,
+      '#2563eb',
+      '#93c5fd',
+    )
   })
 }
 
@@ -187,11 +222,20 @@ function drawSprite(
   context.fillRect(x + 8, y + 8, BLOCK_WIDTH - 16, 4)
 }
 
-function drawLauncher(context: CanvasRenderingContext2D, sprites: GameSprites | null) {
+function drawLauncher(
+  context: CanvasRenderingContext2D,
+  sprites: GameSprites | null,
+) {
   const launcherHeight = GAME_HEIGHT - PLAYFIELD_HEIGHT
 
   if (sprites) {
-    context.drawImage(sprites.launcherPanel, 0, PLAYFIELD_HEIGHT, GAME_WIDTH, launcherHeight)
+    context.drawImage(
+      sprites.launcherPanel,
+      0,
+      PLAYFIELD_HEIGHT,
+      GAME_WIDTH,
+      launcherHeight,
+    )
   } else {
     context.fillStyle = '#0b1226'
     context.fillRect(0, PLAYFIELD_HEIGHT, GAME_WIDTH, launcherHeight)
@@ -200,7 +244,9 @@ function drawLauncher(context: CanvasRenderingContext2D, sprites: GameSprites | 
   context.fillStyle = 'rgba(255, 255, 255, 0.72)'
   context.font = '700 16px ui-monospace, monospace'
   context.textAlign = 'center'
-  ;['A', 'S', 'K', 'L'].forEach((key, column) => context.fillText(key, column * BLOCK_WIDTH + BLOCK_WIDTH / 2, 770))
+  ;['A', 'S', 'K', 'L'].forEach((key, column) =>
+    context.fillText(key, column * BLOCK_WIDTH + BLOCK_WIDTH / 2, 770),
+  )
 }
 
 function drawPreparation(context: CanvasRenderingContext2D, remaining: number) {
@@ -209,5 +255,9 @@ function drawPreparation(context: CanvasRenderingContext2D, remaining: number) {
   context.fillStyle = '#ffffff'
   context.font = '900 56px ui-monospace, monospace'
   context.textAlign = 'center'
-  context.fillText(String(Math.ceil(remaining)), GAME_WIDTH / 2, PLAYFIELD_HEIGHT / 2)
+  context.fillText(
+    String(Math.ceil(remaining)),
+    GAME_WIDTH / 2,
+    PLAYFIELD_HEIGHT / 2,
+  )
 }
