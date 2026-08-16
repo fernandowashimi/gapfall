@@ -47,3 +47,7 @@ _Avoid_: level length, difficulty timer
 **Playing Time**:
 Elapsed duration of the playing phase in a round. Preparation and pause do not advance it.
 _Avoid_: wall clock, session time, survival time
+
+**Death Line**:
+The lower bound of the playfield.
+_Avoid_: bottom edge, floor, fail line

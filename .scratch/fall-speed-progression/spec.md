@@ -45,7 +45,7 @@ Fall Speed rises smoothly with Playing Time and then stops at a Speed Cap. Every
 31. As a developer, I want existing shot, Cascade, and death-line tests to keep passing under constant Fall Speed, so that this feature does not silently rewrite unrelated rules.
 32. As a developer, I want to observe Playing Time and row positions from the public game state, so that tests prove the ramp without inspecting private spawn bookkeeping.
 33. As the product team, I want this change confined to the game core, so that the Canvas renderer and React shell keep consuming state without a new difficulty UI.
-34. As the product team, I want GAME_SPEC’s “constant speed for v1” note superseded by this spec and ADR-0001, so that the old out-of-scope line cannot be read as current law.
+34. As the product team, I want the originating v1 spec not to restate constant Fall Speed as current law, so that this spec and ADR-0001 cannot be overridden by a leftover kickstart document.
 
 ## Implementation Decisions
 
@@ -69,7 +69,7 @@ Fall Speed rises smoothly with Playing Time and then stops at a Speed Cap. Every
 - Generated Line spawn is driven by distance fallen, not by wall-clock seconds. Spawn one Generated Line per block-height of board travel, carrying a remainder, so the Continuous Stream stays packed at every Fall Speed. Today’s “one spawn per second” is only correct while Fall Speed equals Base Fall Speed.
 - Every row, Generated Line and Partial Line, moves by that same displacement. Shot travel still uses the existing constant Shot speed.
 - Death, collisions, Cascades, and same-update save stay in the current update order: resolve shots and removals, then test the death line.
-- Update GAME_SPEC so constant Fall Speed is no longer listed as a v1 constraint. This spec and ADR-0001 are the source of truth for the ramp.
+- Do not revive a root `GAME_SPEC.md`. The originating product definition lives at `.scratch/gapfall-v1/spec.md` and defers the ramp to this spec and ADR-0001.
 
 ## Testing Decisions
 
@@ -101,6 +101,6 @@ Fall Speed rises smoothly with Playing Time and then stops at a Speed Cap. Every
 
 ## Further Notes
 
-- This reverses GAME_SPEC’s out-of-scope line “Aceleração progressiva de dificuldade; nesta versão a velocidade é constante.” Implementation should edit that document so it cannot fight ADR-0001.
+- This reverses the old kickstart constraint that v1 Fall Speed stayed constant. `.scratch/gapfall-v1/spec.md` must keep deferring the ramp to this spec and ADR-0001; do not restore a root `GAME_SPEC.md`.
 - Default 3× and 60s are tunables. Changing them later is expected; changing the clock (Playing Time), the lockstep Continuous Stream, or constant Shot speed would be a new decision.
 - High Fall Speed shrinks decision time and closes the death line faster. Constant Shot speed means the launcher does not time-warp with the board; that squeeze is intentional.
