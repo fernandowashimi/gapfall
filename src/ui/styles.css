@@ -151,6 +151,75 @@ button {
   outline-offset: 3px;
 }
 
+.menu-overlay {
+  gap: 14px;
+}
+
+.menu-title {
+  font:
+    900 42px/1 'Orbitron',
+    sans-serif;
+  color: #22c55e;
+}
+
+.menu-actions {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 240px);
+  margin-top: 8px;
+}
+
+.menu-actions button {
+  margin-top: 0;
+  width: 100%;
+}
+
+.menu-credit {
+  margin-top: 12px;
+  color: #93c5fd;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.menu-credit:hover,
+.menu-credit:focus-visible {
+  color: #fff;
+}
+
+.instructions-list {
+  margin: 0;
+  padding: 0 0 0 1.1em;
+  text-align: left;
+  color: #dbeafe;
+  font-size: 13px;
+  line-height: 1.45;
+  max-width: 28ch;
+}
+
+.instructions-list kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  color: #bbf7d0;
+  font: inherit;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(100%, 240px);
+  color: #dbeafe;
+}
+
+.settings-row input[type='range'] {
+  flex: 1;
+  accent-color: #22c55e;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .game-overlay button {
     transition: none;

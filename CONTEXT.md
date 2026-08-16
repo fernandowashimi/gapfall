@@ -45,9 +45,25 @@ Playing Time until Fall Speed reaches the Speed Cap. After that, Fall Speed stay
 _Avoid_: level length, difficulty timer
 
 **Playing Time**:
-Elapsed duration of the playing phase in a round. Preparation and pause do not advance it.
+Elapsed duration of the playing phase in a Round. Preparation and pause do not advance it.
 _Avoid_: wall clock, session time, survival time
+
+**Round**:
+One attempt from choosing Play until the Death Line ends it, or the player returns to the Main Menu.
+_Avoid_: game, run, session, life
 
 **Death Line**:
 The lower bound of the playfield.
 _Avoid_: bottom edge, floor, fail line
+
+**Main Menu**:
+The app’s home screen outside an active Round. The app opens here; it shows the title, local high score, Play / Settings / Instructions, and project credit.
+_Avoid_: title screen, lobby, home
+
+**Settings**:
+Player-controlled sound mute and volume only — not Fall Speed or other round rules. Reachable from the Main Menu and from pause. Mute and volume persist across visits.
+_Avoid_: options, preferences, difficulty menu
+
+**Instructions**:
+A static how-to-play screen (controls and core rules) reached from the Main Menu only — not a tutorial Round.
+_Avoid_: tutorial, help, tips, onboarding

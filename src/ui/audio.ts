@@ -3,6 +3,10 @@ import detonateUrl from '../assets/audio/detonate.wav'
 import missUrl from '../assets/audio/miss.wav'
 import deathUrl from '../assets/audio/death.wav'
 import type { FeedbackSound } from './cues'
+import {
+  DEFAULT_AUDIO_VOLUME,
+  type AudioSettings,
+} from './audio-settings'
 
 const soundUrls: Record<FeedbackSound, string> = {
   launch: launchUrl,
@@ -16,13 +20,21 @@ export interface GameAudio {
   silence(): void
   unsilence(): void
   unlock(): void
+  applySettings(settings: AudioSettings): void
 }
 
-export function createGameAudio(): GameAudio {
+export function createGameAudio(
+  initial: AudioSettings = {
+    muted: false,
+    volume: DEFAULT_AUDIO_VOLUME,
+  },
+): GameAudio {
   const buffers = new Map<FeedbackSound, HTMLAudioElement>()
   const active = new Set<HTMLAudioElement>()
   let unlocked = false
-  let muted = false
+  let suppressed = false
+  let userMuted = initial.muted
+  let volume = initial.volume
 
   for (const [name, url] of Object.entries(soundUrls) as [
     FeedbackSound,
@@ -44,19 +56,19 @@ export function createGameAudio(): GameAudio {
           .then(() => {
             audio.pause()
             audio.currentTime = 0
-            audio.volume = 1
+            audio.volume = volume
           })
           .catch(() => {
-            audio.volume = 1
+            audio.volume = volume
           })
       }
     },
     play(sound) {
-      if (muted || !unlocked) return
+      if (suppressed || userMuted || !unlocked) return
       const template = buffers.get(sound)
       if (!template) return
       const instance = template.cloneNode(true) as HTMLAudioElement
-      instance.volume = 1
+      instance.volume = volume
       active.add(instance)
       instance.addEventListener('ended', () => active.delete(instance), {
         once: true,
@@ -66,7 +78,7 @@ export function createGameAudio(): GameAudio {
       })
     },
     silence() {
-      muted = true
+      suppressed = true
       for (const instance of active) {
         instance.pause()
         instance.currentTime = 0
@@ -74,7 +86,20 @@ export function createGameAudio(): GameAudio {
       active.clear()
     },
     unsilence() {
-      muted = false
+      suppressed = false
+    },
+    applySettings(settings) {
+      userMuted = settings.muted
+      volume = settings.volume
+      if (userMuted) {
+        for (const instance of active) {
+          instance.pause()
+          instance.currentTime = 0
+        }
+        active.clear()
+      } else {
+        for (const instance of active) instance.volume = volume
+      }
     },
   }
 }

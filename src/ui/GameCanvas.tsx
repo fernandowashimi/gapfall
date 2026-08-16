@@ -16,7 +16,7 @@ import {
   type Column,
   type GameState,
 } from '../game/game-core'
-import { createGameAudio, type GameAudio } from './audio'
+import type { GameAudio } from './audio'
 import { readCues, type DetonationCue } from './cues'
 import {
   EXPLOSION_FRAME_COUNT,
@@ -29,6 +29,8 @@ import {
 interface GameCanvasProps {
   onGameChange: (game: GameState) => void
   resumeRequest: number
+  pauseRequest: number
+  audio: GameAudio
 }
 
 const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
@@ -38,14 +40,23 @@ interface ActiveDetonation extends DetonationCue {
   age: number
 }
 
-export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
+export function GameCanvas({
+  onGameChange,
+  resumeRequest,
+  pauseRequest,
+  audio,
+}: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const gameRef = useRef<GameState>(createGame())
   const spritesRef = useRef<GameSprites | null>(null)
-  const audioRef = useRef<GameAudio>(createGameAudio())
+  const audioRef = useRef(audio)
   const detonationsRef = useRef<ActiveDetonation[]>([])
   const wasPausedRef = useRef(false)
   const notifyGameChange = useEffectEvent(onGameChange)
+
+  useEffect(() => {
+    audioRef.current = audio
+  }, [audio])
 
   useEffect(() => {
     let cancelled = false
@@ -56,7 +67,6 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
       .catch((error) => console.error(error))
     return () => {
       cancelled = true
-      audioRef.current.silence()
     }
   }, [])
 
@@ -112,7 +122,24 @@ export function GameCanvas({ onGameChange, resumeRequest }: GameCanvasProps) {
     return () => cancelAnimationFrame(frameId)
   }, [])
 
+  const ignorePauseRequestRef = useRef(true)
   useEffect(() => {
+    if (ignorePauseRequestRef.current) {
+      ignorePauseRequestRef.current = false
+      return
+    }
+    gameRef.current = pauseGame(gameRef.current)
+    audioRef.current.silence()
+    wasPausedRef.current = true
+    notifyGameChange(gameRef.current)
+  }, [pauseRequest])
+
+  const ignoreResumeRequestRef = useRef(true)
+  useEffect(() => {
+    if (ignoreResumeRequestRef.current) {
+      ignoreResumeRequestRef.current = false
+      return
+    }
     gameRef.current = resumeGame(gameRef.current)
     audioRef.current.unsilence()
     wasPausedRef.current = false

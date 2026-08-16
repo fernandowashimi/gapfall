@@ -11,11 +11,16 @@ npm run dev
 
 Open the URL Vite prints (usually `http://localhost:5173`).
 
+The app opens on the **Main Menu**. Choose **Play** to start a Round. **Settings** is mute/volume only; **Instructions** is a static how-to-play screen.
+
 | Input                | Action                          |
 | -------------------- | ------------------------------- |
 | `A` `S` `K` `L`      | Launch a shot in columns 1–4    |
 | Tap / click a column | Same as the matching key        |
+| `Esc`                | Pause / resume (during a Round) |
 | Tab away / blur      | Pause (resume from the overlay) |
+
+From pause you can resume, open Settings, or return to the Main Menu. On game-over: Play again or Main Menu.
 
 Survive as long as you can. Score rises as you clear lines; the local high score is stored in the browser.
 
