@@ -182,8 +182,19 @@ function drawRow(
   row: GameState['rows'][number],
   sprites: GameSprites | null,
 ) {
-  row.cells.forEach((filled, column) => {
-    if (!filled) return
+  row.cells.forEach((cell, column) => {
+    if (cell === 'empty') return
+    if (cell === 'tnt') {
+      drawSprite(
+        context,
+        sprites?.tntBlock ?? null,
+        column,
+        row.y,
+        '#22c55e',
+        '#bbf7d0',
+      )
+      return
+    }
     const stoneSprite =
       (row.id + column) % 2 === 0
         ? sprites?.stoneBlock

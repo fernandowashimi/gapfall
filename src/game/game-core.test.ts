@@ -3,13 +3,30 @@ import {
   advanceGame,
   BLOCK_HEIGHT,
   createGame,
+  isRowComplete,
   launchBlock,
   pauseGame,
   PLAYFIELD_HEIGHT,
   resumeGame,
   SHOT_SPEED,
   startGame,
+  type Cell,
+  type Column,
 } from './game-core'
+
+const stone = 'stone' as const
+const empty = 'empty' as const
+const tnt = 'tnt' as const
+
+function generatedCells(gap: Column): Cell[] {
+  const cells: Cell[] = [stone, stone, stone, stone]
+  cells[gap] = empty
+  return cells
+}
+
+function completeCells(): Cell[] {
+  return [stone, stone, stone, stone]
+}
 
 describe('game core', () => {
   it('removes the lowest generated row when its empty slot is hit', () => {
@@ -27,13 +44,23 @@ describe('game core', () => {
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0.3)
 
-    expect(game.rows.some((row) => row.cells.every(Boolean))).toBe(true)
+    expect(game.rows.some(isRowComplete)).toBe(true)
     expect(game.score).toBe(0)
 
     game = advanceGame(game, 0.001, () => 0.3)
 
-    expect(game.rows.some((row) => row.cells.every(Boolean))).toBe(false)
+    expect(game.rows.some(isRowComplete)).toBe(false)
     expect(game.score).toBe(1)
+  })
+
+  it('keeps a placed shot as tnt instead of turning it into stone', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.3)
+
+    const completed = game.rows.find(isRowComplete)
+    expect(completed?.cells[1]).toBe(tnt)
+    expect(completed?.cells.filter((cell) => cell === stone)).toHaveLength(3)
   })
 
   it('keeps generated rows touching while the board moves continuously', () => {
@@ -65,13 +92,13 @@ describe('game core', () => {
     game = advanceGame(game, 1.5, () => 0.8)
 
     expect(game.score).toBe(0)
-    expect(game.rows.some((row) => row.cells.every(Boolean))).toBe(true)
+    expect(game.rows.some(isRowComplete)).toBe(true)
 
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0.8)
 
     expect(game.score).toBe(0)
-    expect(game.rows.filter((row) => row.cells.every(Boolean))).toHaveLength(2)
+    expect(game.rows.filter(isRowComplete)).toHaveLength(2)
 
     game = advanceGame(game, 0.001, () => 0.8)
 
@@ -92,23 +119,26 @@ describe('game core', () => {
     game = {
       ...game,
       rows: [
-        { id: 1, y: 120, cells: [true, false, true, true] },
-        { id: 2, y: 75, cells: [true, true, true, true] },
-        { id: 3, y: 30, cells: [true, false, true, true] },
+        { id: 1, y: 120, cells: generatedCells(1) },
+        { id: 2, y: 75, cells: completeCells() },
+        { id: 3, y: 30, cells: generatedCells(1) },
       ],
     }
     game = launchBlock(game, 1)
     game = advanceGame(game, 1.5, () => 0)
 
     expect(game.score).toBe(0)
-    expect(game.rows.find((row) => row.id === 1)?.cells.every(Boolean)).toBe(
-      true,
-    )
+    expect(game.rows.find((row) => row.id === 1)?.cells).toEqual([
+      stone,
+      tnt,
+      stone,
+      stone,
+    ])
 
     game = advanceGame(game, 0.001, () => 0)
 
     expect(game.score).toBe(3)
-    expect(game.rows.find((row) => row.id === 3)?.cells[1]).toBe(false)
+    expect(game.rows.find((row) => row.id === 3)?.cells[1]).toBe(empty)
   })
 
   it('travels through the lower gap before filling a consecutive upper gap', () => {
@@ -116,8 +146,8 @@ describe('game core', () => {
     game = {
       ...game,
       rows: [
-        { id: 1, y: 200, cells: [true, false, true, true] },
-        { id: 2, y: 155, cells: [true, false, true, true] },
+        { id: 1, y: 200, cells: generatedCells(1) },
+        { id: 2, y: 155, cells: generatedCells(1) },
       ],
       shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
     }
@@ -125,14 +155,14 @@ describe('game core', () => {
     game = advanceGame(game, 0.001, () => 0)
 
     expect(game.shots).toHaveLength(1)
-    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(false)
-    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(false)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
 
     game = advanceGame(game, 0.2, () => 0)
 
     expect(game.shots).toHaveLength(0)
-    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(false)
-    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(true)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
   })
 
   it('fills the topmost gap in an arbitrarily long consecutive empty column', () => {
@@ -140,10 +170,10 @@ describe('game core', () => {
     game = {
       ...game,
       rows: [
-        { id: 1, y: 300, cells: [true, false, true, true] },
-        { id: 2, y: 255, cells: [true, false, true, true] },
-        { id: 3, y: 210, cells: [true, false, true, true] },
-        { id: 4, y: 165, cells: [true, false, true, true] },
+        { id: 1, y: 300, cells: generatedCells(1) },
+        { id: 2, y: 255, cells: generatedCells(1) },
+        { id: 3, y: 210, cells: generatedCells(1) },
+        { id: 4, y: 165, cells: generatedCells(1) },
       ],
       shots: [{ id: 99, column: 1, y: 300 + BLOCK_HEIGHT - 1 }],
     }
@@ -152,20 +182,20 @@ describe('game core', () => {
 
     expect(game.shots).toHaveLength(1)
     expect(game.rows.map((row) => row.cells[1])).toEqual([
-      false,
-      false,
-      false,
-      false,
+      empty,
+      empty,
+      empty,
+      empty,
     ])
 
     game = advanceGame(game, 0.4, () => 0)
 
     expect(game.shots).toHaveLength(0)
-    expect(game.rows.find((row) => row.id === 4)?.cells[1]).toBe(true)
+    expect(game.rows.find((row) => row.id === 4)?.cells[1]).toBe(tnt)
     expect(
       game.rows
         .filter((row) => row.id !== 4)
-        .every((row) => row.cells[1] === false),
+        .every((row) => row.cells[1] === empty),
     ).toBe(true)
 
     game = {
@@ -174,9 +204,9 @@ describe('game core', () => {
     }
     game = advanceGame(game, 0.5, () => 0)
 
-    expect(game.rows.find((row) => row.id === 3)?.cells[1]).toBe(true)
-    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(false)
-    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(false)
+    expect(game.rows.find((row) => row.id === 3)?.cells[1]).toBe(tnt)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
   })
 
   it('starts a round at playing time zero', () => {
@@ -224,7 +254,7 @@ describe('game core', () => {
         {
           id: 1,
           y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT,
-          cells: [true, false, true, true],
+          cells: generatedCells(1),
         },
       ],
     }
@@ -318,7 +348,7 @@ describe('game core', () => {
     game = {
       ...game,
       playingTime: 60,
-      rows: [{ id: 1, y: 0, cells: [true, false, true, true] }],
+      rows: [{ id: 1, y: 0, cells: generatedCells(1) }],
       shots: [{ id: 99, column: 1, y: 400 }],
     }
     game = advanceGame(game, 0.1, () => 0)
@@ -380,7 +410,7 @@ function travelStateAfter(
   game = {
     ...game,
     playingTime,
-    rows: [{ id: 1, y: 100, cells: [true, false, true, true] }],
+    rows: [{ id: 1, y: 100, cells: generatedCells(1) }],
   }
   return advanceGame(game, elapsedSeconds, () => 0)
 }

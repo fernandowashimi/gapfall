@@ -20,11 +20,21 @@ export const DEFAULT_FALL_SPEED: FallSpeedConfig = {
 
 export type Column = 0 | 1 | 2 | 3
 export type GamePhase = 'preparing' | 'playing' | 'paused' | 'game-over'
+/** Generated blocks are stone; Shot placements are tnt. */
+export type Cell = 'empty' | 'stone' | 'tnt'
 
 export interface GameRow {
   id: number
   y: number
-  cells: readonly boolean[]
+  cells: readonly Cell[]
+}
+
+export function isOccupied(cell: Cell): boolean {
+  return cell !== 'empty'
+}
+
+export function isRowComplete(row: GameRow): boolean {
+  return row.cells.every(isOccupied)
 }
 
 export interface Shot {
@@ -180,7 +190,7 @@ function resolveShotCollisions(state: GameState): GameState {
       continue
     }
 
-    if (!frontline.cells[shot.column]) {
+    if (!isOccupied(frontline.cells[shot.column])) {
       const gapStack = consecutiveGapStack(rows, frontline, shot.column)
       const target = gapStack[gapStack.length - 1]
       if (gapStack.length > 1 && shot.y > target.y + BLOCK_HEIGHT) {
@@ -214,7 +224,8 @@ function consecutiveGapStack(
   while (true) {
     const next = rows.find(
       (row) =>
-        approximatelyEqual(row.y, expectedY) && row.cells[column] === false,
+        approximatelyEqual(row.y, expectedY) &&
+        !isOccupied(row.cells[column]),
     )
     if (!next) break
     stack.push(next)
@@ -234,8 +245,8 @@ function placeShotOnSolid(
   )
   if (rowBelow) return fillCell(rows, rowBelow.id, column)
 
-  const cells = [false, false, false, false]
-  cells[column] = true
+  const cells: Cell[] = ['empty', 'empty', 'empty', 'empty']
+  cells[column] = 'tnt'
   return [
     ...rows,
     { id: nextRowId(rows), y: frontline.y + BLOCK_HEIGHT, cells },
@@ -249,7 +260,7 @@ function removeEligibleRows(rows: readonly GameRow[]): {
   const sorted = [...rows].sort((a, b) => b.y - a.y)
   let removed = 0
 
-  while (sorted[0] && sorted[0].cells.every(Boolean)) {
+  while (sorted[0] && isRowComplete(sorted[0])) {
     sorted.shift()
     removed += 1
   }
@@ -338,8 +349,8 @@ function createGeneratedRow(
   let gap = Math.floor(random() * COLUMN_COUNT) as Column
   if (gap === previousGap && consecutiveGapCount >= 2)
     gap = ((gap + 1) % COLUMN_COUNT) as Column
-  const cells = [true, true, true, true]
-  cells[gap] = false
+  const cells: Cell[] = ['stone', 'stone', 'stone', 'stone']
+  cells[gap] = 'empty'
   return [
     { id, y, cells },
     gap,
@@ -355,7 +366,7 @@ function fillCell(
   return rows.map((row) => {
     if (row.id !== rowId) return row
     const cells = [...row.cells]
-    cells[column] = true
+    cells[column] = 'tnt'
     return { ...row, cells }
   })
 }
