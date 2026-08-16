@@ -1,23 +1,29 @@
-import { useEffect, useEffectEvent, useRef } from 'react'
-import type { PointerEvent } from 'react'
+import { useEffect, useRef } from 'react'
+import type { MutableRefObject, PointerEvent } from 'react'
 import {
-  advanceGame,
   BLOCK_HEIGHT,
   BLOCK_WIDTH,
   COLUMN_COUNT,
-  createGame,
   GAME_HEIGHT,
   GAME_WIDTH,
   isOccupied,
-  launchBlock,
-  pauseGame,
   PLAYFIELD_HEIGHT,
-  resumeGame,
   type Column,
   type GameState,
 } from '../game/game-core'
 import type { GameAudio } from './audio'
-import { readCues, type DetonationCue } from './cues'
+import {
+  DETONATION_DURATION,
+  applyAudioGate,
+  hudOf,
+  launchRound,
+  pauseRound,
+  tickRound,
+  type ActiveDetonation,
+  type RoundHud,
+  type RoundResult,
+  type RoundSession,
+} from './round'
 import {
   EXPLOSION_FRAME_COUNT,
   EXPLOSION_FRAME_HEIGHT,
@@ -27,36 +33,30 @@ import {
 } from './sprites'
 
 interface GameCanvasProps {
-  onGameChange: (game: GameState) => void
-  resumeRequest: number
-  pauseRequest: number
+  sessionRef: MutableRefObject<RoundSession | null>
+  onHudChange: (hud: RoundHud) => void
   audio: GameAudio
 }
 
 const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
-const DETONATION_DURATION = 0.2
-
-interface ActiveDetonation extends DetonationCue {
-  age: number
-}
 
 export function GameCanvas({
-  onGameChange,
-  resumeRequest,
-  pauseRequest,
+  sessionRef,
+  onHudChange,
   audio,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const gameRef = useRef<GameState>(createGame())
   const spritesRef = useRef<GameSprites | null>(null)
   const audioRef = useRef(audio)
-  const detonationsRef = useRef<ActiveDetonation[]>([])
-  const wasPausedRef = useRef(false)
-  const notifyGameChange = useEffectEvent(onGameChange)
+  const onHudChangeRef = useRef(onHudChange)
 
   useEffect(() => {
     audioRef.current = audio
   }, [audio])
+
+  useEffect(() => {
+    onHudChangeRef.current = onHudChange
+  }, [onHudChange])
 
   useEffect(() => {
     let cancelled = false
@@ -71,7 +71,9 @@ export function GameCanvas({
   }, [])
 
   useEffect(() => {
-    notifyGameChange(gameRef.current)
+    const session = sessionRef.current
+    if (session) notifyHudChange(onHudChangeRef, session)
+
     const canvas = canvasRef.current
     const context = canvas?.getContext('2d')
     if (!context) return
@@ -84,94 +86,61 @@ export function GameCanvas({
     const tick = (now: number) => {
       const delta = Math.min((now - lastFrame) / 1000, 0.1)
       lastFrame = now
-      const before = gameRef.current
-      const next = advanceGame(before, delta)
-      gameRef.current = next
-
-      const paused = next.phase === 'paused'
-      if (paused && !wasPausedRef.current) {
-        audioRef.current.silence()
-      } else if (!paused && wasPausedRef.current) {
-        audioRef.current.unsilence()
+      const current = sessionRef.current
+      if (current) {
+        const result = tickRound(current, delta)
+        commitRound(sessionRef, result, audioRef.current, onHudChangeRef)
+        drawGame(
+          context,
+          result.session.game,
+          spritesRef.current,
+          result.session.detonations,
+        )
       }
-      wasPausedRef.current = paused
-
-      if (!paused) {
-        applyCues(before, next, detonationsRef.current, audioRef.current)
-        advanceDetonations(detonationsRef.current, delta)
-      }
-
-      drawGame(
-        context,
-        next,
-        spritesRef.current,
-        detonationsRef.current,
-      )
-      if (before.score !== next.score || before.phase !== next.phase)
-        notifyGameChange(next)
       frameId = requestAnimationFrame(tick)
     }
 
-    drawGame(
-      context,
-      gameRef.current,
-      spritesRef.current,
-      detonationsRef.current,
-    )
+    if (session) {
+      drawGame(context, session.game, spritesRef.current, session.detonations)
+    }
     frameId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frameId)
-  }, [])
-
-  const ignorePauseRequestRef = useRef(true)
-  useEffect(() => {
-    if (ignorePauseRequestRef.current) {
-      ignorePauseRequestRef.current = false
-      return
-    }
-    gameRef.current = pauseGame(gameRef.current)
-    audioRef.current.silence()
-    wasPausedRef.current = true
-    notifyGameChange(gameRef.current)
-  }, [pauseRequest])
-
-  const ignoreResumeRequestRef = useRef(true)
-  useEffect(() => {
-    if (ignoreResumeRequestRef.current) {
-      ignoreResumeRequestRef.current = false
-      return
-    }
-    gameRef.current = resumeGame(gameRef.current)
-    audioRef.current.unsilence()
-    wasPausedRef.current = false
-    notifyGameChange(gameRef.current)
-  }, [resumeRequest])
+  }, [sessionRef])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const column = keyColumns[event.key.toLowerCase()]
       if (column === undefined || event.repeat) return
       event.preventDefault()
+      const current = sessionRef.current
+      if (!current) return
       audioRef.current.unlock()
-      const before = gameRef.current
-      const next = launchBlock(before, column)
-      gameRef.current = next
-      if (next.phase === 'playing') {
-        applyCues(before, next, detonationsRef.current, audioRef.current)
-      }
+      commitRound(
+        sessionRef,
+        launchRound(current, column),
+        audioRef.current,
+        onHudChangeRef,
+      )
     }
     const handleVisibility = () => {
-      if (document.hidden) {
-        gameRef.current = pauseGame(gameRef.current)
-        audioRef.current.silence()
-        wasPausedRef.current = true
-      }
-      notifyGameChange(gameRef.current)
+      const current = sessionRef.current
+      if (!current || !document.hidden) return
+      commitRound(
+        sessionRef,
+        pauseRound(current),
+        audioRef.current,
+        onHudChangeRef,
+      )
     }
     const handleBlur = () => {
-      gameRef.current = pauseGame(gameRef.current)
-      audioRef.current.silence()
-      wasPausedRef.current = true
-      notifyGameChange(gameRef.current)
+      const current = sessionRef.current
+      if (!current) return
+      commitRound(
+        sessionRef,
+        pauseRound(current),
+        audioRef.current,
+        onHudChangeRef,
+      )
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -182,9 +151,11 @@ export function GameCanvas({
       window.removeEventListener('blur', handleBlur)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [])
+  }, [sessionRef])
 
   const handlePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
+    const current = sessionRef.current
+    if (!current) return
     const bounds = event.currentTarget.getBoundingClientRect()
     const x = (event.clientX - bounds.left) * (GAME_WIDTH / bounds.width)
     const column = Math.min(
@@ -192,12 +163,12 @@ export function GameCanvas({
       Math.max(0, Math.floor(x / BLOCK_WIDTH)),
     ) as Column
     audioRef.current.unlock()
-    const before = gameRef.current
-    const next = launchBlock(before, column)
-    gameRef.current = next
-    if (next.phase === 'playing') {
-      applyCues(before, next, detonationsRef.current, audioRef.current)
-    }
+    commitRound(
+      sessionRef,
+      launchRound(current, column),
+      audioRef.current,
+      onHudChangeRef,
+    )
   }
 
   return (
@@ -212,29 +183,29 @@ export function GameCanvas({
   )
 }
 
-function applyCues(
-  before: GameState,
-  next: GameState,
-  detonations: ActiveDetonation[],
-  audio: GameAudio,
+function notifyHudChange(
+  onHudChangeRef: MutableRefObject<(hud: RoundHud) => void>,
+  session: RoundSession,
 ) {
-  if (next.phase === 'paused') return
-  const cues = readCues(before, next)
-  for (const detonation of cues.detonations) {
-    detonations.push({ ...detonation, age: 0 })
-  }
-  for (const sound of cues.sounds) audio.play(sound)
+  onHudChangeRef.current(hudOf(session))
 }
 
-function advanceDetonations(
-  detonations: ActiveDetonation[],
-  delta: number,
+function commitRound(
+  sessionRef: MutableRefObject<RoundSession | null>,
+  result: RoundResult,
+  audio: GameAudio,
+  onHudChangeRef: MutableRefObject<(hud: RoundHud) => void>,
 ) {
-  for (const detonation of detonations) detonation.age += delta
-  for (let index = detonations.length - 1; index >= 0; index -= 1) {
-    if (detonations[index].age >= DETONATION_DURATION) {
-      detonations.splice(index, 1)
-    }
+  const previous = sessionRef.current
+  sessionRef.current = result.session
+  applyAudioGate(result.audioGate, audio)
+  for (const sound of result.sounds) audio.play(sound)
+  if (
+    !previous ||
+    previous.game.score !== result.session.game.score ||
+    previous.game.phase !== result.session.game.phase
+  ) {
+    notifyHudChange(onHudChangeRef, result.session)
   }
 }
 

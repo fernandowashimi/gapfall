@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import type { GameState } from '../game/game-core'
 import {
   createShellState,
   reduceShell,
@@ -13,6 +12,16 @@ import {
   type AudioSettings,
 } from './audio-settings'
 import { GameCanvas } from './GameCanvas'
+import {
+  applyAudioGate,
+  createRound,
+  hudOf,
+  pauseRound,
+  resumeRound,
+  type RoundHud,
+  type RoundResult,
+  type RoundSession,
+} from './round'
 
 const REPO_URL = 'https://github.com/fernandowashimi/gapfall'
 
@@ -23,14 +32,12 @@ export default function App() {
     shellRef.current = shell
   }, [shell])
 
-  const [round, setRound] = useState(0)
-  const [resumeRequest, setResumeRequest] = useState(0)
-  const [pauseRequest, setPauseRequest] = useState(0)
-  const [game, setGame] = useState<GameState | null>(null)
-  const gameRef = useRef(game)
+  const sessionRef = useRef<RoundSession | null>(null)
+  const [hud, setHud] = useState<RoundHud | null>(null)
+  const hudRef = useRef(hud)
   useEffect(() => {
-    gameRef.current = game
-  }, [game])
+    hudRef.current = hud
+  }, [hud])
 
   const [highScore, setHighScore] = useState(readHighScore)
   const [audioSettings, setAudioSettings] = useState(readAudioSettings)
@@ -48,17 +55,19 @@ export default function App() {
 
     if (result.effect === 'start' || result.effect === 'remount') {
       audio.unsilence()
-      setGame(null)
-      setRound((value) => value + 1)
+      const session = createRound()
+      sessionRef.current = session
+      setHud(hudOf(session))
     } else if (result.effect === 'pause') {
-      setPauseRequest((value) => value + 1)
+      applyRoundCommand(sessionRef, pauseRound, audio, setHud)
     } else if (result.effect === 'resume') {
-      setResumeRequest((value) => value + 1)
+      applyRoundCommand(sessionRef, resumeRound, audio, setHud)
     }
 
     if (intent.type === 'abandon') {
       audio.unsilence()
-      setGame(null)
+      sessionRef.current = null
+      setHud(null)
     }
   }
   const dispatchRef = useRef(dispatch)
@@ -70,27 +79,30 @@ export default function App() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.repeat) return
       event.preventDefault()
-      dispatchRef.current({ type: 'escape', phase: gameRef.current?.phase })
+      dispatchRef.current({
+        type: 'escape',
+        phase: sessionRef.current?.game.phase ?? hudRef.current?.phase,
+      })
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const handleGameChange = (nextGame: GameState) => {
-    gameRef.current = nextGame
-    setGame(nextGame)
+  const handleHudChange = (nextHud: RoundHud) => {
+    hudRef.current = nextHud
+    setHud(nextHud)
     setHighScore((currentHighScore) => {
-      if (nextGame.score <= currentHighScore) return currentHighScore
-      localStorage.setItem('gapfall:high-score', String(nextGame.score))
-      return nextGame.score
+      if (nextHud.score <= currentHighScore) return currentHighScore
+      localStorage.setItem('gapfall:high-score', String(nextHud.score))
+      return nextHud.score
     })
   }
 
   const inRound = shell.mode === 'round'
   const showPause =
-    inRound && game?.phase === 'paused' && shell.overlay !== 'settings'
+    inRound && hud?.phase === 'paused' && shell.overlay !== 'settings'
   const showGameOver =
-    inRound && game?.phase === 'game-over' && shell.overlay === 'none'
+    inRound && hud?.phase === 'game-over' && shell.overlay === 'none'
 
   return (
     <main className="app-shell">
@@ -101,16 +113,14 @@ export default function App() {
               <div>
                 <p className="eyebrow">Gapfall</p>
                 <h1>
-                  Score <span>{game?.score ?? 0}</span>
+                  Score <span>{hud?.score ?? 0}</span>
                 </h1>
               </div>
             </header>
             <GameCanvas
-              key={round}
               audio={audio}
-              onGameChange={handleGameChange}
-              pauseRequest={pauseRequest}
-              resumeRequest={resumeRequest}
+              sessionRef={sessionRef}
+              onHudChange={handleHudChange}
             />
           </>
         ) : null}
@@ -170,12 +180,10 @@ export default function App() {
                 <kbd>L</kbd> ou tocando na coluna.
               </li>
               <li>
-                Preencha a Frontline (a linha mais baixa em aberto) para remover.
-                Cascades dão mais pontos.
+                Preencha a Frontline (a linha mais baixa em aberto) para
+                remover. Cascades dão mais pontos.
               </li>
-              <li>
-                Se qualquer bloco tocar a Death Line, a rodada acaba.
-              </li>
+              <li>Se qualquer bloco tocar a Death Line, a rodada acaba.</li>
               <li>
                 Esc ou sair da aba pausa. O recorde fica salvo neste navegador.
               </li>
@@ -205,7 +213,7 @@ export default function App() {
             aria-label="Fim de jogo"
           >
             <p className="eyebrow">FIM DE JOGO</p>
-            <strong>{game?.score ?? 0}</strong>
+            <strong>{hud?.score ?? 0}</strong>
             <span>pontos</span>
             <span>recorde: {highScore}</span>
             <div className="menu-actions">
@@ -214,7 +222,7 @@ export default function App() {
                 onClick={() =>
                   dispatch({
                     type: 'play-again',
-                    phase: game?.phase,
+                    phase: hud?.phase,
                   })
                 }
               >
@@ -235,7 +243,10 @@ export default function App() {
             <p className="eyebrow">PAUSADO</p>
             <span>A partida foi pausada.</span>
             <div className="menu-actions">
-              <button type="button" onClick={() => dispatch({ type: 'resume' })}>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'resume' })}
+              >
                 Continuar
               </button>
               <button
@@ -243,7 +254,7 @@ export default function App() {
                 onClick={() =>
                   dispatch({
                     type: 'open-settings',
-                    phase: game?.phase,
+                    phase: hud?.phase,
                   })
                 }
               >
@@ -261,6 +272,20 @@ export default function App() {
       </section>
     </main>
   )
+}
+
+function applyRoundCommand(
+  sessionRef: { current: RoundSession | null },
+  command: (session: RoundSession) => RoundResult,
+  audio: { silence(): void; unsilence(): void },
+  setHud: (hud: RoundHud) => void,
+) {
+  const session = sessionRef.current
+  if (!session) return
+  const result = command(session)
+  sessionRef.current = result.session
+  applyAudioGate(result.audioGate, audio)
+  setHud(hudOf(result.session))
 }
 
 function SettingsOverlay({
