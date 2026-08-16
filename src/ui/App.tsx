@@ -11,6 +11,7 @@ import {
   writeAudioSettings,
   type AudioSettings,
 } from './audio-settings'
+import gapfallLogoUrl from '../assets/branding/gapfall-logo.png'
 import { GameCanvas } from './GameCanvas'
 import {
   applyAudioGate,
@@ -131,8 +132,13 @@ export default function App() {
             role="dialog"
             aria-label="Menu principal"
           >
-            <p className="eyebrow">GAPFALL</p>
-            <strong className="menu-title">Gapfall</strong>
+            <img
+              className="menu-logo"
+              src={gapfallLogoUrl}
+              alt="Gapfall"
+              width={1370}
+              height={359}
+            />
             <span>recorde: {highScore}</span>
             <div className="menu-actions">
               <button type="button" onClick={() => dispatch({ type: 'play' })}>
@@ -157,7 +163,7 @@ export default function App() {
               target="_blank"
               rel="noreferrer"
             >
-              made by Shinji
+              credits
             </a>
           </div>
         ) : null}
