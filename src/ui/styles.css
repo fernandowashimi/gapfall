@@ -24,7 +24,6 @@ button {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  gap: 16px;
   padding: max(16px, env(safe-area-inset-top)) 16px
     max(16px, env(safe-area-inset-bottom));
   background: radial-gradient(circle at top, #172b59 0, #070b16 52%);
@@ -32,7 +31,7 @@ button {
 
 .game-frame {
   position: relative;
-  width: min(100%, 450px, calc((100dvh - 84px) * 0.45));
+  width: min(100%, 450px, calc((100dvh - 48px) * 0.45));
   aspect-ratio: 9 / 20;
   overflow: hidden;
   border: 1px solid rgba(147, 197, 253, 0.48);
@@ -78,11 +77,6 @@ button {
   color: #fff;
   font-size: 24px;
 }
-.key-hint {
-  color: #dbeafe;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-}
 
 .game-overlay {
   position: absolute;
@@ -126,12 +120,6 @@ button {
   transform: translateY(-2px);
   outline: 3px solid #fff;
   outline-offset: 3px;
-}
-.instructions {
-  margin: 0;
-  color: #cbd5e1;
-  font-size: 12px;
-  text-align: center;
 }
 
 @media (prefers-reduced-motion: reduce) {

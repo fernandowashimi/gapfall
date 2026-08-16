@@ -28,9 +28,6 @@ export default function App() {
               Score <span>{game.score}</span>
             </h1>
           </div>
-          <div className="key-hint" aria-label="Teclas: A, S, K e L">
-            A&nbsp;S&nbsp;K&nbsp;L
-          </div>
         </header>
         <GameCanvas
           key={round}
@@ -69,9 +66,6 @@ export default function App() {
           </div>
         )}
       </section>
-      <p className="instructions">
-        Toque em uma coluna ou pressione A, S, K ou L para lançar.
-      </p>
     </main>
   )
 }

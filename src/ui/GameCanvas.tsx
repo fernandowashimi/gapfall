@@ -240,13 +240,6 @@ function drawLauncher(
     context.fillStyle = '#0b1226'
     context.fillRect(0, PLAYFIELD_HEIGHT, GAME_WIDTH, launcherHeight)
   }
-
-  context.fillStyle = 'rgba(255, 255, 255, 0.72)'
-  context.font = '700 16px ui-monospace, monospace'
-  context.textAlign = 'center'
-  ;['A', 'S', 'K', 'L'].forEach((key, column) =>
-    context.fillText(key, column * BLOCK_WIDTH + BLOCK_WIDTH / 2, 770),
-  )
 }
 
 function drawPreparation(context: CanvasRenderingContext2D, remaining: number) {
