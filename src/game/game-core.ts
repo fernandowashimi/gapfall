@@ -45,8 +45,8 @@ export interface Shot {
 
 export interface GameState {
   phase: GamePhase
-  rows: readonly GameRow[]
-  shots: readonly Shot[]
+  rows: GameRow[]
+  shots: Shot[]
   score: number
   preparationRemaining: number
   spawnElapsed: number
@@ -126,60 +126,48 @@ export function advanceGame(
 
   if (state.phase === 'preparing') {
     const remaining = state.preparationRemaining - elapsedSeconds
-    return remaining > 0
-      ? { ...state, preparationRemaining: remaining }
-      : advanceGame(
-          { ...state, phase: 'playing', preparationRemaining: 0 },
-          -remaining,
-          random,
-        )
+    if (remaining > 0) {
+      state.preparationRemaining = remaining
+      return state
+    }
+    state.phase = 'playing'
+    state.preparationRemaining = 0
+    return advanceGame(state, -remaining, random)
   }
 
   // Clear lines completed on a previous frame so the filled gap is visible for at least one tick.
-  const afterDetonation = detonateEligibleRows(state)
+  detonateEligibleRows(state)
   const displacement = fallDisplacement(
-    afterDetonation.playingTime,
+    state.playingTime,
     elapsedSeconds,
-    afterDetonation.fallSpeedConfig,
+    state.fallSpeedConfig,
   )
-  const shiftedRows = afterDetonation.rows.map((row) => ({
-    ...row,
-    y: row.y + displacement,
-  }))
-  const movedShots = afterDetonation.shots.map((shot) => ({
-    ...shot,
-    y: shot.y - SHOT_SPEED * elapsedSeconds,
-  }))
-  const afterCollisions = resolveShotCollisions({
-    ...afterDetonation,
-    rows: shiftedRows,
-    shots: movedShots,
-  })
-  const afterSpawning = spawnRows(afterCollisions, displacement, random)
-  const lost = afterSpawning.rows.some(
+  for (const row of state.rows) {
+    row.y += displacement
+  }
+  for (const shot of state.shots) {
+    shot.y -= SHOT_SPEED * elapsedSeconds
+  }
+  if (state.shots.length > 0) resolveShotCollisions(state)
+  spawnRows(state, displacement, random)
+  const lost = state.rows.some(
     (row) => row.y + BLOCK_HEIGHT >= PLAYFIELD_HEIGHT,
   )
-
-  return {
-    ...afterSpawning,
-    playingTime: afterSpawning.playingTime + elapsedSeconds,
-    phase: lost ? 'game-over' : 'playing',
-  }
+  state.playingTime += elapsedSeconds
+  if (lost) state.phase = 'game-over'
+  return state
 }
 
-function detonateEligibleRows(state: GameState): GameState {
+function detonateEligibleRows(state: GameState): void {
   const cascade = removeEligibleRows(state.rows)
-  if (cascade.removed === 0) return state
+  if (cascade.removed === 0) return
 
-  return {
-    ...state,
-    rows: cascade.rows,
-    score: state.score + scoreForCascade(cascade.removed),
-  }
+  state.rows = cascade.rows
+  state.score += scoreForCascade(cascade.removed)
 }
 
-function resolveShotCollisions(state: GameState): GameState {
-  let rows = [...state.rows]
+function resolveShotCollisions(state: GameState): void {
+  let rows = state.rows
   let nextId = state.nextId
   const remainingShots: Shot[] = []
 
@@ -209,7 +197,9 @@ function resolveShotCollisions(state: GameState): GameState {
     rows = placedRows
   }
 
-  return { ...state, rows, shots: remainingShots, nextId }
+  state.rows = rows
+  state.shots = remainingShots
+  state.nextId = nextId
 }
 
 /** Bottom-to-top contiguous empty cells in `column`, starting at the frontline. */
@@ -224,8 +214,7 @@ function consecutiveGapStack(
   while (true) {
     const next = rows.find(
       (row) =>
-        approximatelyEqual(row.y, expectedY) &&
-        !isOccupied(row.cells[column]),
+        approximatelyEqual(row.y, expectedY) && !isOccupied(row.cells[column]),
     )
     if (!next) break
     stack.push(next)
@@ -257,6 +246,11 @@ function removeEligibleRows(rows: readonly GameRow[]): {
   rows: GameRow[]
   removed: number
 } {
+  const frontline = lowestRow(rows)
+  if (!frontline || !isRowComplete(frontline)) {
+    return { rows: rows as GameRow[], removed: 0 }
+  }
+
   const sorted = [...rows].sort((a, b) => b.y - a.y)
   let removed = 0
 
@@ -272,17 +266,20 @@ function spawnRows(
   state: GameState,
   displacement: number,
   random: Random,
-): GameState {
+): void {
   const accumulated = state.spawnElapsed + displacement / BLOCK_HEIGHT
   const spawns = Math.floor(accumulated)
-  const spawnElapsed = accumulated - spawns
+  state.spawnElapsed = accumulated - spawns
+  if (spawns === 0) return
+
   let nextId = state.nextId
   let previousGap = state.previousGap
   let consecutiveGapCount = state.consecutiveGapCount
   const rows = [...state.rows]
 
   for (let index = 0; index < spawns; index += 1) {
-    const y = (spawns - index - 1 + spawnElapsed) * BLOCK_HEIGHT - BLOCK_HEIGHT
+    const y =
+      (spawns - index - 1 + state.spawnElapsed) * BLOCK_HEIGHT - BLOCK_HEIGHT
     const [row, gap, count] = createGeneratedRow(
       nextId,
       y,
@@ -296,14 +293,10 @@ function spawnRows(
     consecutiveGapCount = count
   }
 
-  return {
-    ...state,
-    rows,
-    spawnElapsed,
-    nextId,
-    previousGap,
-    consecutiveGapCount,
-  }
+  state.rows = rows
+  state.nextId = nextId
+  state.previousGap = previousGap
+  state.consecutiveGapCount = consecutiveGapCount
 }
 
 function resolveFallSpeedConfig(

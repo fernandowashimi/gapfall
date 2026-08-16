@@ -8,6 +8,7 @@ import {
   startGame,
   type Cell,
   type Column,
+  type GameState,
 } from '../game/game-core'
 import { readCues } from './cues'
 
@@ -23,6 +24,14 @@ function generatedCells(gap: Column): Cell[] {
 
 function createGameAtBaseFallSpeed(random: () => number) {
   return createGame(random, { speedCapMultiplier: 1 })
+}
+
+function snapshotGame(game: GameState): GameState {
+  return {
+    ...game,
+    rows: game.rows.map((row) => ({ ...row, cells: [...row.cells] })),
+    shots: game.shots.map((shot) => ({ ...shot })),
+  }
 }
 
 describe('readCues', () => {
@@ -50,12 +59,12 @@ describe('readCues', () => {
   it('emits no detonation or miss when a fill only completes a line', () => {
     let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
     game = launchBlock(game, 1)
-    const before = game
-    const after = advanceGame(before, 1.5, () => 0.3)
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 1.5, () => 0.3)
 
-    expect(after.rows.some((row) => row.cells.every((cell) => cell !== empty))).toBe(
-      true,
-    )
+    expect(
+      after.rows.some((row) => row.cells.every((cell) => cell !== empty)),
+    ).toBe(true)
     expect(after.score).toBe(0)
     expect(readCues(before, after)).toEqual({
       detonations: [],
@@ -71,8 +80,8 @@ describe('readCues', () => {
       row.cells.every((cell) => cell !== empty),
     )
     expect(completed).toBeDefined()
-    const before = game
-    const after = advanceGame(before, 0.001, () => 0.3)
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 0.001, () => 0.3)
 
     expect(after.score).toBe(1)
     expect(readCues(before, after)).toEqual({
@@ -92,8 +101,8 @@ describe('readCues', () => {
       .filter((row) => row.cells.every((cell) => cell !== empty))
       .sort((a, b) => b.y - a.y)
     expect(completed).toHaveLength(2)
-    const before = game
-    const after = advanceGame(before, 0.001, () => 0.8)
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 0.001, () => 0.8)
 
     expect(after.score).toBe(3)
     expect(readCues(before, after)).toEqual({
@@ -110,8 +119,8 @@ describe('readCues', () => {
       shots: [],
     }
     game = launchBlock(game, 0)
-    const before = game
-    const after = advanceGame(before, 1.5, () => 0)
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 1.5, () => 0)
 
     expect(after.rows.some((row) => row.y > 200)).toBe(true)
     expect(readCues(before, after)).toEqual({
@@ -130,8 +139,8 @@ describe('readCues', () => {
       ],
       shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
     }
-    const before = game
-    let after = advanceGame(before, 0.001, () => 0)
+    const before = snapshotGame(game)
+    let after = advanceGame(game, 0.001, () => 0)
     after = advanceGame(after, 0.2, () => 0)
 
     expect(after.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
@@ -148,8 +157,8 @@ describe('readCues', () => {
       rows: [{ id: 1, y: 720 - BLOCK_HEIGHT, cells: generatedCells(1) }],
       shots: [],
     }
-    const before = game
-    const after = advanceGame(before, 1, () => 0)
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 1, () => 0)
 
     expect(after.phase).toBe('game-over')
     expect(readCues(before, after)).toEqual({

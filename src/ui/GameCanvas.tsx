@@ -46,6 +46,7 @@ export function GameCanvas({
   audio,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const fpsRef = useRef<HTMLDivElement>(null)
   const spritesRef = useRef<GameSprites | null>(null)
   const audioRef = useRef(audio)
   const onHudChangeRef = useRef(onHudChange)
@@ -96,6 +97,9 @@ export function GameCanvas({
           spritesRef.current,
           result.session.detonations,
         )
+      }
+      if (import.meta.env.DEV && fpsRef.current) {
+        fpsRef.current.textContent = `${Math.round(1 / Math.max(delta, 1 / 1000))} FPS`
       }
       frameId = requestAnimationFrame(tick)
     }
@@ -172,14 +176,19 @@ export function GameCanvas({
   }
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="game-canvas"
-      width={GAME_WIDTH}
-      height={GAME_HEIGHT}
-      onPointerDown={handlePointerDown}
-      aria-label="Campo do jogo. Toque em uma coluna para lançar TNT."
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="game-canvas"
+        width={GAME_WIDTH}
+        height={GAME_HEIGHT}
+        onPointerDown={handlePointerDown}
+        aria-label="Campo do jogo. Toque em uma coluna para lançar TNT."
+      />
+      {import.meta.env.DEV ? (
+        <div ref={fpsRef} className="fps-overlay" aria-hidden="true" />
+      ) : null}
+    </>
   )
 }
 

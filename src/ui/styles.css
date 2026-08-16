@@ -77,6 +77,20 @@ button {
   cursor: crosshair;
 }
 
+.fps-overlay {
+  position: absolute;
+  z-index: 1;
+  right: 12px;
+  bottom: 12px;
+  pointer-events: none;
+  color: #bbf7d0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 12px #000;
+}
+
 .game-hud {
   position: absolute;
   z-index: 1;

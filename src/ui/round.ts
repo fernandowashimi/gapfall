@@ -1,6 +1,7 @@
 import {
   advanceGame,
   createGame,
+  isRowComplete,
   launchBlock,
   pauseGame,
   resumeGame,
@@ -57,16 +58,22 @@ export function tickRound(
   dt: number,
   random: () => number = Math.random,
 ): RoundResult {
-  const game = advanceGame(session.game, dt, random)
-  if (game.phase === 'paused') {
+  const previousPhase = session.game.phase
+  if (previousPhase === 'paused' || previousPhase === 'game-over') {
     return {
-      session: { game, detonations: session.detonations },
+      session: { game: session.game, detonations: session.detonations },
       sounds: [],
-      audioGate: audioGateFor(session.game.phase, game.phase),
+      audioGate: audioGateFor(previousPhase, session.game.phase),
     }
   }
 
-  const cues = readCues(session.game, game)
+  const previous = cueDiffNeeded(session.game)
+    ? snapshotGame(session.game)
+    : null
+  const game = advanceGame(session.game, dt, random)
+  const cues = previous
+    ? readCues(previous, game)
+    : deathCues(previousPhase, game.phase)
   const spawned = cues.detonations.map((detonation) => ({
     ...detonation,
     age: 0,
@@ -77,7 +84,7 @@ export function tickRound(
       detonations: ageDetonations([...session.detonations, ...spawned], dt),
     },
     sounds: cues.sounds,
-    audioGate: audioGateFor(session.game.phase, game.phase),
+    audioGate: audioGateFor(previousPhase, game.phase),
   }
 }
 
@@ -133,6 +140,27 @@ function audioGateFor(
   if (!wasPaused && isPaused) return 'silence'
   if (wasPaused && !isPaused) return 'unsilence'
   return 'unchanged'
+}
+
+function cueDiffNeeded(game: GameState): boolean {
+  return game.shots.length > 0 || game.rows.some(isRowComplete)
+}
+
+function snapshotGame(game: GameState): GameState {
+  return {
+    ...game,
+    rows: game.rows.map((row) => ({ ...row, cells: [...row.cells] })),
+    shots: game.shots.map((shot) => ({ ...shot })),
+  }
+}
+
+function deathCues(
+  previousPhase: GameState['phase'],
+  nextPhase: GameState['phase'],
+): { detonations: DetonationCue[]; sounds: readonly FeedbackSound[] } {
+  return previousPhase !== 'game-over' && nextPhase === 'game-over'
+    ? { detonations: [], sounds: ['death'] }
+    : { detonations: [], sounds: [] }
 }
 
 function ageDetonations(

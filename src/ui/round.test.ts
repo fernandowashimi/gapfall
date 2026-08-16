@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BLOCK_HEIGHT,
+  PLAYFIELD_HEIGHT,
+  type Cell,
+  type Column,
+} from '../game/game-core'
+import {
   createRound,
   launchRound,
   pauseRound,
@@ -112,6 +118,24 @@ describe('Round commands', () => {
     expect(result.sounds).toEqual(['detonate'])
   })
 
+  it('records stacked detonations for a two-line cascade', () => {
+    let session = tickRound(
+      createRound(() => 0.3),
+      3.1,
+      () => 0.3,
+    ).session
+    session = tickRound(session, 1, () => 0.3).session
+    session = launchRound(session, 1).session
+    session = tickRound(session, 1.5, () => 0.8).session
+    session = launchRound(session, 1).session
+    session = tickRound(session, 1.5, () => 0.8).session
+    const result = tickRound(session, 0.001, () => 0.8)
+
+    expect(result.session.game.score).toBe(3)
+    expect(result.sounds).toEqual(['detonate', 'detonate'])
+    expect(result.session.detonations).toHaveLength(2)
+  })
+
   it('freezes detonations while paused', () => {
     const withDetonation = removeFrontline()
     const paused = pauseRound(withDetonation).session
@@ -133,7 +157,99 @@ describe('Round commands', () => {
     const finished = tickRound(aged.session, 0.2, () => 0.3)
     expect(finished.session.detonations).toEqual([])
   })
+
+  it('emits no sounds on a quiet playing tick', () => {
+    const playing = tickRound(
+      createRound(() => 0.3),
+      3.1,
+      () => 0.3,
+    ).session
+    const result = tickRound(playing, 0.001, () => 0.3)
+
+    expect(result.sounds).toEqual([])
+    expect(result.session.detonations).toEqual([])
+  })
+
+  it('emits miss when a shot stacks into a partial line', () => {
+    let session = tickRound(
+      createRound(() => 0),
+      3.1,
+      () => 0,
+    ).session
+    session = {
+      ...session,
+      game: {
+        ...session.game,
+        rows: [{ id: 1, y: 200, cells: generatedCells(1) }],
+        shots: [],
+      },
+    }
+    session = launchRound(session, 0).session
+    const result = tickRound(session, 1.5, () => 0)
+
+    expect(result.sounds).toEqual(['miss'])
+  })
+
+  it('emits death when the frontline reaches the death line with no shot', () => {
+    let session = tickRound(
+      createRound(() => 0),
+      3.1,
+      () => 0,
+    ).session
+    session = {
+      ...session,
+      game: {
+        ...session.game,
+        rows: [
+          {
+            id: 1,
+            y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT,
+            cells: generatedCells(1),
+          },
+        ],
+        shots: [],
+      },
+    }
+    const result = tickRound(session, 0.001, () => 0)
+
+    expect(result.session.game.phase).toBe('game-over')
+    expect(result.sounds).toEqual(['death'])
+  })
+
+  it('does not repeat death on later game-over ticks', () => {
+    let session = tickRound(
+      createRound(() => 0),
+      3.1,
+      () => 0,
+    ).session
+    session = {
+      ...session,
+      game: {
+        ...session.game,
+        rows: [
+          {
+            id: 1,
+            y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT,
+            cells: generatedCells(1),
+          },
+        ],
+        shots: [{ id: 99, column: 1, y: 400 }],
+      },
+    }
+    const lost = tickRound(session, 0.001, () => 0)
+    const later = tickRound(lost.session, 0.1, () => 0)
+
+    expect(lost.sounds).toEqual(['death'])
+    expect(later.sounds).toEqual([])
+    expect(later.session.game).toBe(lost.session.game)
+  })
 })
+
+function generatedCells(gap: Column): Cell[] {
+  const cells: Cell[] = ['stone', 'stone', 'stone', 'stone']
+  cells[gap] = 'empty'
+  return cells
+}
 
 function removeFrontline() {
   let session = tickRound(

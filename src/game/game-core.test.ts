@@ -395,6 +395,151 @@ describe('game core', () => {
 
     expect(game.score).toBe(3)
   })
+
+  it('keeps the same row objects on a quiet playing tick', () => {
+    const game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    const row = game.rows[0]
+    const y = row.y
+
+    const next = advanceGame(game, 0.001, () => 0.3)
+
+    expect(next.rows).toHaveLength(1)
+    expect(next.rows[0]).toBe(row)
+    expect(next.rows[0].y).toBeGreaterThan(y)
+    expect(next.playingTime).toBeCloseTo(0.001)
+  })
+
+  it('keeps previous row objects when a generated line spawns', () => {
+    const game = startGame(createGameAtBaseFallSpeed(() => 0))
+    const original = game.rows[0]
+
+    const next = advanceGame(game, 1, () => 0)
+
+    expect(next.rows).toHaveLength(2)
+    expect(next.rows).toContain(original)
+    expect(next.rows.some((row) => row !== original)).toBe(true)
+  })
+
+  it('keeps the same shot objects while they only travel', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [{ id: 1, y: 0, cells: generatedCells(1) }],
+      shots: [{ id: 99, column: 1, y: 400 }],
+    }
+    const shot = game.shots[0]
+    const y = shot.y
+
+    const next = advanceGame(game, 0.001, () => 0)
+
+    expect(next.shots).toHaveLength(1)
+    expect(next.shots[0]).toBe(shot)
+    expect(next.shots[0].y).toBeLessThan(y)
+  })
+
+  it('keeps survivor row objects after the one-tick detonation', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.3)
+    const survivors = game.rows.filter((row) => !isRowComplete(row))
+
+    const next = advanceGame(game, 0.001, () => 0.3)
+
+    expect(next.score).toBe(1)
+    expect(next.rows.some(isRowComplete)).toBe(false)
+    for (const row of survivors) {
+      expect(next.rows).toContain(row)
+    }
+  })
+
+  it('keeps survivor row objects after a two-line cascade', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = advanceGame(game, 1, () => 0.3)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    const survivors = game.rows.filter((row) => !isRowComplete(row))
+
+    const next = advanceGame(game, 0.001, () => 0.8)
+
+    expect(next.score).toBe(3)
+    expect(next.rows.some(isRowComplete)).toBe(false)
+    for (const row of survivors) {
+      expect(next.rows).toContain(row)
+    }
+  })
+
+  it('replaces only the filled row and keeps unrelated row objects', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        { id: 1, y: 200, cells: generatedCells(1) },
+        { id: 2, y: 155, cells: generatedCells(0) },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const frontline = game.rows[0]
+    const unrelated = game.rows[1]
+
+    const next = advanceGame(game, 0.001, () => 0)
+
+    expect(next.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
+    expect(next.rows.find((row) => row.id === 1)).not.toBe(frontline)
+    expect(next.rows.find((row) => row.id === 2)).toBe(unrelated)
+  })
+
+  it('keeps the frontline object when a miss stacks a new partial line', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [{ id: 1, y: 200, cells: generatedCells(1) }],
+      shots: [{ id: 99, column: 0, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const frontline = game.rows[0]
+
+    const next = advanceGame(game, 0.001, () => 0)
+
+    expect(next.rows).toContain(frontline)
+    expect(next.rows.some((row) => row !== frontline)).toBe(true)
+    expect(next.shots).toHaveLength(0)
+  })
+
+  it('does not mutate the input when launching a shot', () => {
+    const before = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    const shots = before.shots
+
+    const next = launchBlock(before, 1)
+
+    expect(next).not.toBe(before)
+    expect(before.shots).toBe(shots)
+    expect(before.shots).toHaveLength(0)
+    expect(next.shots).toHaveLength(1)
+  })
+
+  it('returns the same state object for pause, game-over, and non-positive time', () => {
+    const playing = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    expect(advanceGame(playing, 0, () => 0.3)).toBe(playing)
+
+    const paused = pauseGame(playing)
+    expect(advanceGame(paused, 1, () => 0.3)).toBe(paused)
+
+    let lost = startGame(createGameAtBaseFallSpeed(() => 0))
+    lost = {
+      ...lost,
+      rows: [
+        {
+          id: 1,
+          y: PLAYFIELD_HEIGHT - BLOCK_HEIGHT,
+          cells: generatedCells(1),
+        },
+      ],
+    }
+    lost = advanceGame(lost, 0.001, () => 0)
+    expect(lost.phase).toBe('game-over')
+    expect(advanceGame(lost, 1, () => 0)).toBe(lost)
+  })
 })
 
 function createGameAtBaseFallSpeed(random: () => number) {
