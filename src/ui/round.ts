@@ -32,6 +32,7 @@ export interface RoundResult {
   session: RoundSession
   sounds: readonly FeedbackSound[]
   audioGate: AudioGate
+  hudChanged: boolean
 }
 
 export function createRound(random?: () => number): RoundSession {
@@ -58,13 +59,14 @@ export function tickRound(
   dt: number,
   random: () => number = Math.random,
 ): RoundResult {
-  const previousPhase = session.game.phase
-  if (previousPhase === 'paused' || previousPhase === 'game-over') {
-    return {
-      session: { game: session.game, detonations: session.detonations },
-      sounds: [],
-      audioGate: audioGateFor(previousPhase, session.game.phase),
-    }
+  const previousHud = hudOf(session)
+  if (previousHud.phase === 'paused' || previousHud.phase === 'game-over') {
+    return roundResult(
+      { game: session.game, detonations: session.detonations },
+      [],
+      audioGateFor(previousHud.phase, session.game.phase),
+      previousHud,
+    )
   }
 
   const previous = cueDiffNeeded(session.game)
@@ -73,32 +75,30 @@ export function tickRound(
   const game = advanceGame(session.game, dt, random)
   const cues = previous
     ? readCues(previous, game)
-    : deathCues(previousPhase, game.phase)
+    : deathCues(previousHud.phase, game.phase)
   const spawned = cues.detonations.map((detonation) => ({
     ...detonation,
     age: 0,
   }))
-  return {
-    session: {
+  return roundResult(
+    {
       game,
       detonations: ageDetonations([...session.detonations, ...spawned], dt),
     },
-    sounds: cues.sounds,
-    audioGate: audioGateFor(previousPhase, game.phase),
-  }
+    cues.sounds,
+    audioGateFor(previousHud.phase, game.phase),
+    previousHud,
+  )
 }
 
 export function launchRound(
   session: RoundSession,
   column: Column,
 ): RoundResult {
+  const previousHud = hudOf(session)
   const game = launchBlock(session.game, column)
   if (game.phase !== 'playing') {
-    return {
-      session,
-      sounds: [],
-      audioGate: 'unchanged',
-    }
+    return roundResult(session, [], 'unchanged', previousHud)
   }
 
   const cues = readCues(session.game, game)
@@ -106,28 +106,49 @@ export function launchRound(
     ...detonation,
     age: 0,
   }))
-  return {
-    session: { game, detonations: [...session.detonations, ...spawned] },
-    sounds: cues.sounds,
-    audioGate: 'unchanged',
-  }
+  return roundResult(
+    { game, detonations: [...session.detonations, ...spawned] },
+    cues.sounds,
+    'unchanged',
+    previousHud,
+  )
 }
 
 export function pauseRound(session: RoundSession): RoundResult {
+  const previousHud = hudOf(session)
   const game = pauseGame(session.game)
-  return {
-    session: { game, detonations: session.detonations },
-    sounds: [],
-    audioGate: audioGateFor(session.game.phase, game.phase),
-  }
+  return roundResult(
+    { game, detonations: session.detonations },
+    [],
+    audioGateFor(previousHud.phase, game.phase),
+    previousHud,
+  )
 }
 
 export function resumeRound(session: RoundSession): RoundResult {
+  const previousHud = hudOf(session)
   const game = resumeGame(session.game)
+  return roundResult(
+    { game, detonations: session.detonations },
+    [],
+    audioGateFor(previousHud.phase, game.phase),
+    previousHud,
+  )
+}
+
+function roundResult(
+  session: RoundSession,
+  sounds: readonly FeedbackSound[],
+  audioGate: AudioGate,
+  previousHud: RoundHud,
+): RoundResult {
+  const hud = hudOf(session)
   return {
-    session: { game, detonations: session.detonations },
-    sounds: [],
-    audioGate: audioGateFor(session.game.phase, game.phase),
+    session,
+    sounds,
+    audioGate,
+    hudChanged:
+      hud.score !== previousHud.score || hud.phase !== previousHud.phase,
   }
 }
 

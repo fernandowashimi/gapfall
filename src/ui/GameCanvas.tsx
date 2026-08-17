@@ -209,11 +209,7 @@ function commitRound(
   sessionRef.current = result.session
   applyAudioGate(result.audioGate, audio)
   for (const sound of result.sounds) audio.play(sound)
-  if (
-    !previous ||
-    previous.game.score !== result.session.game.score ||
-    previous.game.phase !== result.session.game.phase
-  ) {
+  if (!previous || result.hudChanged) {
     notifyHudChange(onHudChangeRef, result.session)
   }
 }

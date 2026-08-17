@@ -69,6 +69,7 @@ describe('Round commands', () => {
     expect(result.session.game.playingTime).toBe(playing.game.playingTime)
     expect(result.sounds).toEqual([])
     expect(result.audioGate).toBe('silence')
+    expect(result.hudChanged).toBe(true)
   })
 
   it('does not advance the board while paused', () => {
@@ -116,6 +117,7 @@ describe('Round commands', () => {
     expect(result.session.game.score).toBe(1)
     expect(result.session.detonations).toHaveLength(1)
     expect(result.sounds).toEqual(['detonate'])
+    expect(result.hudChanged).toBe(true)
   })
 
   it('records stacked detonations for a two-line cascade', () => {
@@ -134,6 +136,7 @@ describe('Round commands', () => {
     expect(result.session.game.score).toBe(3)
     expect(result.sounds).toEqual(['detonate', 'detonate'])
     expect(result.session.detonations).toHaveLength(2)
+    expect(result.hudChanged).toBe(true)
   })
 
   it('freezes detonations while paused', () => {
@@ -168,6 +171,7 @@ describe('Round commands', () => {
 
     expect(result.sounds).toEqual([])
     expect(result.session.detonations).toEqual([])
+    expect(result.hudChanged).toBe(false)
   })
 
   it('emits miss when a shot stacks into a partial line', () => {
@@ -214,6 +218,7 @@ describe('Round commands', () => {
 
     expect(result.session.game.phase).toBe('game-over')
     expect(result.sounds).toEqual(['death'])
+    expect(result.hudChanged).toBe(true)
   })
 
   it('does not repeat death on later game-over ticks', () => {
@@ -242,6 +247,7 @@ describe('Round commands', () => {
     expect(lost.sounds).toEqual(['death'])
     expect(later.sounds).toEqual([])
     expect(later.session.game).toBe(lost.session.game)
+    expect(later.hudChanged).toBe(false)
   })
 })
 
