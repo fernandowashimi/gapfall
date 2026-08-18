@@ -304,9 +304,11 @@ function removeEligibleRows(rows: readonly GameRow[]): {
   let reinforcedRemoved = 0
 
   while (sorted[0] && isEligibleForRemoval(sorted[0])) {
-    if (sorted[0].reinforced) reinforcedRemoved += 1
+    const removedRow = sorted[0]
+    if (removedRow.reinforced) reinforcedRemoved += 1
     sorted.shift()
     removed += 1
+    clearPassThroughTntOnReinforcedAbove(sorted, removedRow)
   }
 
   if (
@@ -437,6 +439,32 @@ function crackRow(
     if (row.id !== rowId) return row
     return { ...row, cracked: true, awaitingFinishingShot }
   })
+}
+
+function clearPassThroughTntOnReinforcedAbove(
+  sorted: GameRow[],
+  removedRow: GameRow,
+): void {
+  const rowAbove = sorted[0]
+  if (
+    !removedRow.reinforced ||
+    !rowAbove?.reinforced ||
+    rowAbove.cracked ||
+    !approximatelyEqual(rowAbove.y, removedRow.y - BLOCK_HEIGHT)
+  ) {
+    return
+  }
+
+  const tntColumn = rowAbove.cells.findIndex((cell) => cell === 'tnt')
+  if (tntColumn < 0) return
+
+  sorted[0] = emptyCell(rowAbove, tntColumn as Column)
+}
+
+function emptyCell(row: GameRow, column: Column): GameRow {
+  const cells = [...row.cells]
+  cells[column] = 'empty'
+  return { ...row, cells }
 }
 
 function lowestRow(rows: readonly GameRow[]): GameRow | undefined {

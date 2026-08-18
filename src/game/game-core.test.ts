@@ -788,7 +788,7 @@ describe('game core', () => {
     expect(next.score).toBe(0)
   })
 
-  it('clears two stacked Reinforced Lines in the same column with four Shots', () => {
+  it('clears two stacked Reinforced Lines in the same column with five Shots', () => {
     let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = {
       ...game,
@@ -836,7 +836,8 @@ describe('game core', () => {
 
     game = advanceGame(game, 0.001, () => 0)
     expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
-    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(false)
     expect(game.score).toBe(2)
 
     game = {
@@ -844,12 +845,51 @@ describe('game core', () => {
       shots: [{ id: 102, column: 1, y: lowestFilledBottom(game) }],
     }
     game = advanceGame(game, 0.001, () => 0)
-    expect(game.rows).toHaveLength(1)
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
+
+    game = {
+      ...game,
+      shots: [{ id: 103, column: 1, y: lowestFilledBottom(game) }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
     expect(game.score).toBe(2)
 
     game = advanceGame(game, 0.001, () => 0)
     expect(game.rows.find((row) => row.id === 2)).toBeUndefined()
     expect(game.score).toBe(4)
+  })
+
+  it('clears pass-through tnt on the upper Reinforced Line when the Frontline is removed', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: true,
+        },
+        {
+          id: 2,
+          y: 155,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
+
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(false)
   })
 
   it('adds the Reinforced bonus on a two-line Cascade', () => {
