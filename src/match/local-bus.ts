@@ -10,6 +10,7 @@ const QUEUE_CHANNEL = 'gapfall-versus-queue'
 
 type QueueBusMessage =
   | { type: 'join'; playerId: string }
+  | { type: 'announce'; playerId: string }
   | { type: 'leave'; playerId: string }
   | { type: 'paired'; matchId: string; players: readonly [string, string] }
   | { type: 'match-event'; matchId: string; event: MatchEvent }
@@ -61,24 +62,38 @@ export function openVersusQueue(
     onMessage({ to: playerId, type: 'paired', matchId: id })
   }
 
+  const tryPair = () => {
+    if (matchId || waiters.size < 2) return
+    const [first, second] = [...waiters].sort() as [string, string]
+    if (playerId !== first) return
+    const id = crypto.randomUUID()
+    const players = [first, second] as const
+    waiters.clear()
+    queue.postMessage({
+      type: 'paired',
+      matchId: id,
+      players,
+    } satisfies QueueBusMessage)
+    joinMatch(id, players)
+  }
+
+  const hearOpponent = (otherId: string) => {
+    if (matchId || otherId === playerId) return
+    waiters.add(otherId)
+    tryPair()
+  }
+
   queue.onmessage = (message: MessageEvent<QueueBusMessage>) => {
     const data = message.data
-    if (data.type === 'join' && data.playerId !== playerId) {
-      waiters.add(data.playerId)
-      if (waiters.size === 2) {
-        const [first, second] = [...waiters].sort() as [string, string]
-        if (playerId === first) {
-          const id = crypto.randomUUID()
-          const players = [first, second] as const
-          waiters.clear()
-          queue.postMessage({
-            type: 'paired',
-            matchId: id,
-            players,
-          } satisfies QueueBusMessage)
-          joinMatch(id, players)
-        }
-      }
+    if (data.type === 'join' && data.playerId !== playerId && !matchId) {
+      queue.postMessage({
+        type: 'announce',
+        playerId,
+      } satisfies QueueBusMessage)
+      hearOpponent(data.playerId)
+    }
+    if (data.type === 'announce') {
+      hearOpponent(data.playerId)
     }
     if (data.type === 'leave') {
       waiters.delete(data.playerId)
