@@ -457,7 +457,11 @@ function clearPassThroughTntOnReinforcedAbove(
   const tntColumn = rowAbove.cells.findIndex((cell) => cell === 'tnt')
   if (tntColumn < 0) return
 
-  sorted[0] = emptyCell(rowAbove, tntColumn as Column)
+  sorted[0] = {
+    ...emptyCell(rowAbove, tntColumn as Column),
+    cracked: true,
+    awaitingFinishingShot: false,
+  }
 }
 
 function emptyCell(row: GameRow, column: Column): GameRow {
