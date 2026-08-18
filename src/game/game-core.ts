@@ -447,7 +447,6 @@ function clearPassThroughTntOnReinforcedAbove(
 ): void {
   const rowAbove = sorted[0]
   if (
-    !removedRow.reinforced ||
     !rowAbove?.reinforced ||
     rowAbove.cracked ||
     !approximatelyEqual(rowAbove.y, removedRow.y - BLOCK_HEIGHT)

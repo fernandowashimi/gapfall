@@ -205,7 +205,7 @@ describe('readCues', () => {
     })
   })
 
-  it('emits crack when a complete Reinforced Line is promoted to Frontline', () => {
+  it('emits detonate not crack when pass-through tnt is cleared after normal Frontline removal', () => {
     let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = {
       ...game,
@@ -225,10 +225,10 @@ describe('readCues', () => {
     const before = snapshotGame(game)
     const after = advanceGame(game, 0.001, () => 0)
 
-    expect(after.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(after.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
     expect(readCues(before, after)).toEqual({
       detonations: [{ y: before.rows[0].y, cells: before.rows[0].cells }],
-      sounds: ['detonate', 'crack'],
+      sounds: ['detonate'],
     })
   })
 

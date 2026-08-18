@@ -565,7 +565,8 @@ describe('game core', () => {
 
     game = advanceGame(game, 0.001, () => 0)
     expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
-    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(false)
     expect(game.score).toBe(1)
 
     game = {
@@ -573,7 +574,15 @@ describe('game core', () => {
       shots: [{ id: 100, column: 1, y: lowestFilledBottom(game) }],
     }
     game = advanceGame(game, 0.001, () => 0)
-    expect(game.rows).toHaveLength(1)
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+
+    game = {
+      ...game,
+      shots: [{ id: 101, column: 1, y: lowestFilledBottom(game) }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
+
     game = advanceGame(game, 0.001, () => 0)
     expect(game.rows).toHaveLength(0)
     expect(game.score).toBe(3)
@@ -711,7 +720,7 @@ describe('game core', () => {
     expect(higher?.reinforced).toBe(true)
   })
 
-  it('cracks a complete Reinforced Line when it becomes the Frontline', () => {
+  it('clears pass-through tnt on a Reinforced Line when a normal Frontline is removed', () => {
     let game = startGame(createGameAtBaseFallSpeed(() => 0))
     game = {
       ...game,
@@ -731,11 +740,11 @@ describe('game core', () => {
     expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
 
     game = advanceGame(game, 0.001, () => 0)
-    const promoted = game.rows.find((row) => row.id === 2)
+    const reinforced = game.rows.find((row) => row.id === 2)
 
     expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
-    expect(promoted?.cracked).toBe(true)
-    expect(promoted?.cells[1]).toBe(tnt)
+    expect(reinforced?.cells[1]).toBe(empty)
+    expect(reinforced?.cracked).toBe(false)
     expect(game.score).toBe(1)
   })
 
