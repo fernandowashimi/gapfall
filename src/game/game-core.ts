@@ -55,11 +55,16 @@ export interface Shot {
   y: number
 }
 
+export const VERSUS_FALL_SPEED: Partial<FallSpeedConfig> = {
+  speedCapMultiplier: 1,
+}
+
 export interface GameState {
   phase: GamePhase
   rows: GameRow[]
   shots: Shot[]
   score: number
+  removedThisTick: number
   preparationRemaining: number
   spawnElapsed: number
   playingTime: number
@@ -90,6 +95,7 @@ export function createGame(
     rows: [firstRow],
     shots: [],
     score: 0,
+    removedThisTick: 0,
     preparationRemaining: preparationSeconds,
     spawnElapsed: 0,
     playingTime: 0,
@@ -124,6 +130,49 @@ export function launchBlock(state: GameState, column: Column): GameState {
   }
 }
 
+export function applyExtraGeneratedLines(
+  state: GameState,
+  count: number,
+  random: Random = Math.random,
+): GameState {
+  if (count <= 0) return state
+
+  let topY = state.rows.reduce(
+    (top, row) => Math.min(top, row.y),
+    Number.POSITIVE_INFINITY,
+  )
+  if (!Number.isFinite(topY)) topY = 0
+
+  let nextId = state.nextId
+  let previousGap = state.previousGap
+  let consecutiveGapCount = state.consecutiveGapCount
+  const extras: GameRow[] = []
+
+  for (let index = 0; index < count; index += 1) {
+    const y = topY - BLOCK_HEIGHT
+    const [row, gap, gapCount] = createGeneratedRow(
+      nextId,
+      y,
+      previousGap,
+      consecutiveGapCount,
+      random,
+    )
+    extras.push(row)
+    nextId += 1
+    previousGap = gap
+    consecutiveGapCount = gapCount
+    topY = y
+  }
+
+  return {
+    ...state,
+    rows: [...state.rows, ...extras],
+    nextId,
+    previousGap,
+    consecutiveGapCount,
+  }
+}
+
 export function advanceGame(
   state: GameState,
   elapsedSeconds: number,
@@ -148,6 +197,7 @@ export function advanceGame(
   }
 
   // Clear lines completed on a previous frame so the filled gap is visible for at least one tick.
+  state.removedThisTick = 0
   detonateEligibleRows(state)
   const displacement = fallDisplacement(
     state.playingTime,
@@ -176,6 +226,7 @@ function detonateEligibleRows(state: GameState): void {
 
   state.rows = cascade.rows
   if (cascade.removed === 0) return
+  state.removedThisTick = cascade.removed
   state.score += scoreForCascade(cascade.removed, cascade.reinforcedRemoved)
 }
 
@@ -343,8 +394,13 @@ function spawnRows(
   const rows = [...state.rows]
 
   for (let index = 0; index < spawns; index += 1) {
-    const y =
+    let y =
       (spawns - index - 1 + state.spawnElapsed) * BLOCK_HEIGHT - BLOCK_HEIGHT
+    const occupied = rows.some((row) => approximatelyEqual(row.y, y))
+    if (occupied) {
+      const topY = rows.reduce((top, row) => Math.min(top, row.y), y)
+      y = topY - BLOCK_HEIGHT
+    }
     const [row, gap, count] = createGeneratedRow(
       nextId,
       y,

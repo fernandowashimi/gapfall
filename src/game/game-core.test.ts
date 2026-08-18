@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   advanceGame,
+  applyExtraGeneratedLines,
   BLOCK_HEIGHT,
   createGame,
+  isOccupied,
   isRowComplete,
   launchBlock,
   pauseGame,
@@ -932,6 +934,66 @@ describe('game core', () => {
     lost = advanceGame(lost, 0.001, () => 0)
     expect(lost.phase).toBe('game-over')
     expect(advanceGame(lost, 1, () => 0)).toBe(lost)
+  })
+})
+
+describe('Versus primitives', () => {
+  it('holds Base Fall Speed when the speed cap multiplier is 1', () => {
+    const early = travelAfterPlayingTime(0, 1, { speedCapMultiplier: 1 })
+    const late = travelAfterPlayingTime(60, 1, { speedCapMultiplier: 1 })
+
+    expect(early).toBeCloseTo(BLOCK_HEIGHT)
+    expect(late).toBeCloseTo(BLOCK_HEIGHT)
+  })
+
+  it('still ramps Fall Speed with the default Single Player knobs', () => {
+    const opening = travelAfterPlayingTime(0, 0.001)
+    const cap = travelAfterPlayingTime(120, 0.001)
+
+    expect(opening).toBeCloseTo(BLOCK_HEIGHT * 0.001)
+    expect(cap).toBeCloseTo(BLOCK_HEIGHT * 6 * 0.001)
+  })
+
+  it('stacks extra Generated Lines packed above the current top', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    const topBefore = Math.min(...game.rows.map((row) => row.y))
+    const existing = game.rows[0]
+
+    game = applyExtraGeneratedLines(game, 2, () => 0)
+
+    const extras = game.rows.filter((row) => row !== existing)
+    expect(existing.y).toBe(topBefore)
+    expect(extras).toHaveLength(2)
+    expect(extras.map((row) => row.y).sort((a, b) => b - a)).toEqual([
+      topBefore - BLOCK_HEIGHT,
+      topBefore - 2 * BLOCK_HEIGHT,
+    ])
+    expect(
+      extras.every((row) => row.cells.filter(isOccupied).length === 3),
+    ).toBe(true)
+  })
+
+  it('reports removed-line count for a Cascade, not score', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = advanceGame(game, 1, () => 0.3)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    game = advanceGame(game, 0.001, () => 0.8)
+
+    expect(game.score).toBe(3)
+    expect(game.removedThisTick).toBe(2)
+  })
+
+  it('stacks cadence Generated Lines above extra Generated Lines instead of overlapping them', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = applyExtraGeneratedLines(game, 1, () => 0)
+
+    game = advanceGame(game, 1, () => 0)
+
+    const ys = game.rows.map((row) => Math.round(row.y * 1000) / 1000)
+    expect(new Set(ys).size).toBe(ys.length)
   })
 })
 

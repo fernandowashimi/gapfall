@@ -19,7 +19,13 @@ describe('Round commands', () => {
 
     expect(session.game.phase).toBe('preparing')
     expect(session.game.score).toBe(0)
+    expect(session.frozen).toBe(false)
     expect(session.detonations).toEqual([])
+  })
+
+  it('holds Base Fall Speed for a Versus Round', () => {
+    const versus = createRound(() => 0, 'versus')
+    expect(versus.game.fallSpeedConfig.speedCapMultiplier).toBe(1)
   })
 
   it('ticks past preparation into playing', () => {

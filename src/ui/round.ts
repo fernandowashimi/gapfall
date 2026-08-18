@@ -1,10 +1,12 @@
 import {
   advanceGame,
+  applyExtraGeneratedLines,
   createGame,
   isRowComplete,
   launchBlock,
   pauseGame,
   resumeGame,
+  VERSUS_FALL_SPEED,
   type Column,
   type GameState,
 } from '../game/game-core'
@@ -21,6 +23,7 @@ export interface ActiveDetonation extends DetonationCue {
 export interface RoundSession {
   game: GameState
   detonations: readonly ActiveDetonation[]
+  frozen: boolean
 }
 
 export interface RoundHud {
@@ -33,12 +36,17 @@ export interface RoundResult {
   sounds: readonly FeedbackSound[]
   audioGate: AudioGate
   hudChanged: boolean
+  linesRemoved: number
 }
 
-export function createRound(random?: () => number): RoundSession {
+export function createRound(
+  random?: () => number,
+  kind: 'single-player' | 'versus' = 'single-player',
+): RoundSession {
   return {
-    game: createGame(random),
+    game: createGame(random, kind === 'versus' ? VERSUS_FALL_SPEED : {}),
     detonations: [],
+    frozen: false,
   }
 }
 
@@ -60,9 +68,17 @@ export function tickRound(
   random: () => number = Math.random,
 ): RoundResult {
   const previousHud = hudOf(session)
-  if (previousHud.phase === 'paused' || previousHud.phase === 'game-over') {
+  if (
+    session.frozen ||
+    previousHud.phase === 'paused' ||
+    previousHud.phase === 'game-over'
+  ) {
     return roundResult(
-      { game: session.game, detonations: session.detonations },
+      {
+        game: session.game,
+        detonations: session.detonations,
+        frozen: session.frozen,
+      },
       [],
       audioGateFor(previousHud.phase, session.game.phase),
       previousHud,
@@ -84,6 +100,7 @@ export function tickRound(
     {
       game,
       detonations: ageDetonations([...session.detonations, ...spawned], dt),
+      frozen: session.frozen,
     },
     cues.sounds,
     audioGateFor(previousHud.phase, game.phase),
@@ -107,7 +124,11 @@ export function launchRound(
     age: 0,
   }))
   return roundResult(
-    { game, detonations: [...session.detonations, ...spawned] },
+    {
+      game,
+      detonations: [...session.detonations, ...spawned],
+      frozen: session.frozen,
+    },
     cues.sounds,
     'unchanged',
     previousHud,
@@ -118,7 +139,7 @@ export function pauseRound(session: RoundSession): RoundResult {
   const previousHud = hudOf(session)
   const game = pauseGame(session.game)
   return roundResult(
-    { game, detonations: session.detonations },
+    { game, detonations: session.detonations, frozen: session.frozen },
     [],
     audioGateFor(previousHud.phase, game.phase),
     previousHud,
@@ -129,11 +150,26 @@ export function resumeRound(session: RoundSession): RoundResult {
   const previousHud = hudOf(session)
   const game = resumeGame(session.game)
   return roundResult(
-    { game, detonations: session.detonations },
+    { game, detonations: session.detonations, frozen: session.frozen },
     [],
     audioGateFor(previousHud.phase, game.phase),
     previousHud,
   )
+}
+
+export function freezeRound(session: RoundSession): RoundSession {
+  return { ...session, frozen: true }
+}
+
+export function applyVersusLines(
+  session: RoundSession,
+  count: number,
+  random: () => number = Math.random,
+): RoundSession {
+  return {
+    ...session,
+    game: applyExtraGeneratedLines(session.game, count, random),
+  }
 }
 
 function roundResult(
@@ -149,6 +185,7 @@ function roundResult(
     audioGate,
     hudChanged:
       hud.score !== previousHud.score || hud.phase !== previousHud.phase,
+    linesRemoved: session.game.removedThisTick,
   }
 }
 

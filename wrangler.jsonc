@@ -1,0 +1,12 @@
+{
+  "name": "gapfall-versus",
+  "main": "party/index.ts",
+  "compatibility_date": "2026-04-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "Queue", "class_name": "Queue" },
+      { "name": "Match", "class_name": "Match" },
+    ],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Queue", "Match"] }],
+}

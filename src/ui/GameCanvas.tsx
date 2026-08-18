@@ -36,6 +36,8 @@ interface GameCanvasProps {
   sessionRef: MutableRefObject<RoundSession | null>
   onHudChange: (hud: RoundHud) => void
   audio: GameAudio
+  pauseOnBlur?: boolean
+  onTick?: (result: RoundResult) => void
 }
 
 const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
@@ -44,12 +46,16 @@ export function GameCanvas({
   sessionRef,
   onHudChange,
   audio,
+  pauseOnBlur = true,
+  onTick,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fpsRef = useRef<HTMLDivElement>(null)
   const spritesRef = useRef<GameSprites | null>(null)
   const audioRef = useRef(audio)
   const onHudChangeRef = useRef(onHudChange)
+  const pauseOnBlurRef = useRef(pauseOnBlur)
+  const onTickRef = useRef(onTick)
 
   useEffect(() => {
     audioRef.current = audio
@@ -58,6 +64,14 @@ export function GameCanvas({
   useEffect(() => {
     onHudChangeRef.current = onHudChange
   }, [onHudChange])
+
+  useEffect(() => {
+    pauseOnBlurRef.current = pauseOnBlur
+  }, [pauseOnBlur])
+
+  useEffect(() => {
+    onTickRef.current = onTick
+  }, [onTick])
 
   useEffect(() => {
     let cancelled = false
@@ -91,6 +105,7 @@ export function GameCanvas({
       if (current) {
         const result = tickRound(current, delta)
         commitRound(sessionRef, result, audioRef.current, onHudChangeRef)
+        onTickRef.current?.(result)
         drawGame(
           context,
           result.session.game,
@@ -128,7 +143,7 @@ export function GameCanvas({
     }
     const handleVisibility = () => {
       const current = sessionRef.current
-      if (!current || !document.hidden) return
+      if (!current || !document.hidden || !pauseOnBlurRef.current) return
       commitRound(
         sessionRef,
         pauseRound(current),
@@ -138,7 +153,7 @@ export function GameCanvas({
     }
     const handleBlur = () => {
       const current = sessionRef.current
-      if (!current) return
+      if (!current || !pauseOnBlurRef.current) return
       commitRound(
         sessionRef,
         pauseRound(current),
