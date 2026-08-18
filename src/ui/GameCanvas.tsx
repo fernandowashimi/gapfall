@@ -320,17 +320,20 @@ function drawRow(
       )
       return
     }
-    const stoneSprite =
-      (row.id + column) % 2 === 0
+    const oreSprite = row.reinforced
+      ? row.cracked
+        ? (sprites?.crackedOre ?? sprites?.stoneBlock)
+        : (sprites?.reinforcedOre ?? sprites?.stoneBlock)
+      : (row.id + column) % 2 === 0
         ? sprites?.stoneBlock
         : sprites?.stoneBlockVariant
     drawSprite(
       context,
-      stoneSprite ?? sprites?.stoneBlock ?? null,
+      oreSprite ?? sprites?.stoneBlock ?? null,
       column,
       row.y,
-      '#2563eb',
-      '#93c5fd',
+      row.reinforced ? '#64748b' : '#2563eb',
+      row.reinforced ? '#cbd5e1' : '#93c5fd',
     )
   })
 }

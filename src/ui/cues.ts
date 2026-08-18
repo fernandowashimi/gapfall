@@ -1,11 +1,12 @@
 import {
   isOccupied,
   type Cell,
+  type Column,
   type GameRow,
   type GameState,
 } from '../game/game-core'
 
-export type FeedbackSound = 'launch' | 'detonate' | 'miss' | 'death'
+export type FeedbackSound = 'launch' | 'detonate' | 'miss' | 'death' | 'crack'
 
 export interface DetonationCue {
   y: number
@@ -30,12 +31,18 @@ export function readCues(
   }
 
   const nextRowIds = new Set(next.rows.map((row) => row.id))
+  const previousById = new Map(previous.rows.map((row) => [row.id, row]))
   const removedRows: GameRow[] = []
   for (const row of previous.rows) {
     if (nextRowIds.has(row.id)) continue
     removedRows.push(row)
     detonations.push({ y: row.y, cells: row.cells })
     sounds.push('detonate')
+  }
+
+  for (const row of next.rows) {
+    const prior = previousById.get(row.id)
+    if (prior && !prior.cracked && row.cracked) sounds.push('crack')
   }
 
   const nextShotIds = new Set(next.shots.map((shot) => shot.id))
@@ -45,7 +52,11 @@ export function readCues(
   const frontline = frontlineRow(collisionRows)
 
   for (const shot of consumedShots) {
-    if (frontline && isOccupied(frontline.cells[shot.column])) {
+    if (
+      frontline &&
+      isOccupied(frontline.cells[shot.column]) &&
+      !isReinforcedFinishingShot(frontline, shot.column)
+    ) {
       sounds.push('miss')
     }
   }
@@ -63,4 +74,16 @@ function frontlineRow(rows: readonly GameRow[]): GameRow | undefined {
     if (!frontline || row.y > frontline.y) frontline = row
   }
   return frontline
+}
+
+function isReinforcedFinishingShot(
+  frontline: GameRow,
+  column: Column,
+): boolean {
+  return (
+    frontline.reinforced === true &&
+    frontline.cracked === true &&
+    frontline.awaitingFinishingShot === true &&
+    frontline.cells[column] === 'tnt'
+  )
 }

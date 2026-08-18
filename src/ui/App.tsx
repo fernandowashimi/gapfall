@@ -189,6 +189,11 @@ export default function App() {
                 Preencha a Frontline (a linha mais baixa em aberto) para
                 remover. Cascades dão mais pontos.
               </li>
+              <li>
+                Linhas de minério reforçado exigem dois tiros na Frontline:
+                primeiro racham, depois remova com TNT na coluna do bloco
+                colocado.
+              </li>
               <li>Se qualquer bloco tocar a Death Line, a rodada acaba.</li>
               <li>
                 Esc ou sair da aba pausa. O recorde fica salvo neste navegador.

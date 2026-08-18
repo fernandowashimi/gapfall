@@ -2,6 +2,8 @@ import launcherPanelUrl from '../assets/sprites/launcher_panel.png'
 import playfieldBackgroundUrl from '../assets/sprites/playfield_background.png'
 import stoneBlockUrl from '../assets/sprites/stone_block.png'
 import stoneBlockVariantUrl from '../assets/sprites/stone_block_variant.png'
+import reinforcedOreUrl from '../assets/sprites/reinforced_ore.png'
+import crackedOreUrl from '../assets/sprites/cracked_ore.png'
 import tntBlockUrl from '../assets/sprites/tnt_block.png'
 import explosionStripUrl from '../assets/sprites/explosion_strip.png'
 
@@ -12,6 +14,8 @@ export const EXPLOSION_FRAME_HEIGHT = 45
 export interface GameSprites {
   stoneBlock: HTMLImageElement
   stoneBlockVariant: HTMLImageElement
+  reinforcedOre: HTMLImageElement | null
+  crackedOre: HTMLImageElement | null
   tntBlock: HTMLImageElement
   playfieldBackground: HTMLImageElement
   launcherPanel: HTMLImageElement
@@ -32,6 +36,8 @@ export function loadGameSprites(): Promise<GameSprites> {
   return Promise.all([
     loadImage(stoneBlockUrl),
     loadImage(stoneBlockVariantUrl),
+    loadImage(reinforcedOreUrl).catch(() => null),
+    loadImage(crackedOreUrl).catch(() => null),
     loadImage(tntBlockUrl),
     loadImage(playfieldBackgroundUrl),
     loadImage(launcherPanelUrl),
@@ -40,6 +46,8 @@ export function loadGameSprites(): Promise<GameSprites> {
     ([
       stoneBlock,
       stoneBlockVariant,
+      reinforcedOre,
+      crackedOre,
       tntBlock,
       playfieldBackground,
       launcherPanel,
@@ -47,6 +55,8 @@ export function loadGameSprites(): Promise<GameSprites> {
     ]) => ({
       stoneBlock,
       stoneBlockVariant,
+      reinforcedOre,
+      crackedOre,
       tntBlock,
       playfieldBackground,
       launcherPanel,

@@ -179,4 +179,134 @@ describe('readCues', () => {
       sounds: [],
     })
   })
+
+  it('emits crack without detonate when a Reinforced Frontline Cracks', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 0.001, () => 0)
+
+    expect(after.rows[0]?.cracked).toBe(true)
+    expect(readCues(before, after)).toEqual({
+      detonations: [],
+      sounds: ['crack'],
+    })
+  })
+
+  it('emits crack when a complete Reinforced Line is promoted to Frontline', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        { id: 1, y: 200, cells: generatedCells(1) },
+        {
+          id: 2,
+          y: 155,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 0.001, () => 0)
+
+    expect(after.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(readCues(before, after)).toEqual({
+      detonations: [{ y: before.rows[0].y, cells: before.rows[0].cells }],
+      sounds: ['detonate', 'crack'],
+    })
+  })
+
+  it('emits detonate not crack when a Reinforced Line is removed', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: true,
+        },
+      ],
+      shots: [],
+    }
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 0.001, () => 0)
+
+    expect(after.score).toBe(2)
+    expect(readCues(before, after)).toEqual({
+      detonations: [{ y: before.rows[0].y, cells: before.rows[0].cells }],
+      sounds: ['detonate'],
+    })
+  })
+
+  it('emits neither crack nor miss when filling a higher Reinforced Line', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        { id: 1, y: 200, cells: generatedCells(1) },
+        {
+          id: 2,
+          y: 155,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const before = snapshotGame(game)
+    let after = advanceGame(game, 0.001, () => 0)
+    after = advanceGame(after, 0.2, () => 0)
+
+    expect(after.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
+    expect(readCues(before, after)).toEqual({
+      detonations: [],
+      sounds: [],
+    })
+  })
+
+  it('emits no miss when a Shot finishes a complete Cracked Frontline', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: true,
+          awaitingFinishingShot: true,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const before = snapshotGame(game)
+    const after = advanceGame(game, 0.001, () => 0)
+
+    expect(after.rows).toHaveLength(1)
+    expect(readCues(before, after)).toEqual({
+      detonations: [],
+      sounds: [],
+    })
+  })
 })

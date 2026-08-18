@@ -289,22 +289,28 @@ describe('game core', () => {
     expect(travel).toBeCloseTo(BLOCK_HEIGHT * 0.001)
   })
 
-  it('falls at two block-heights per second at thirty seconds', () => {
-    const travel = travelAfterPlayingTime(30, 0.001)
+  it('falls at two and two-thirds block-heights per second at forty seconds', () => {
+    const travel = travelAfterPlayingTime(40, 0.001)
 
-    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 2 * 0.001)
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * (1 + (5 / 120) * 40) * 0.001)
   })
 
-  it('falls at three block-heights per second at sixty seconds', () => {
+  it('falls at three and a half block-heights per second at sixty seconds', () => {
     const travel = travelAfterPlayingTime(60, 0.001)
 
-    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 3 * 0.001)
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 3.5 * 0.001)
+  })
+
+  it('falls at six block-heights per second at one hundred twenty seconds', () => {
+    const travel = travelAfterPlayingTime(120, 0.001)
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 6 * 0.001)
   })
 
   it('holds the speed cap after the ramp duration', () => {
-    const travel = travelAfterPlayingTime(90, 0.001)
+    const travel = travelAfterPlayingTime(150, 0.001)
 
-    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 3 * 0.001)
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 6 * 0.001)
   })
 
   it('keeps generated rows packed while fall speed ramps', () => {
@@ -370,8 +376,8 @@ describe('game core', () => {
 
     expect(game.fallSpeedConfig).toEqual({
       baseFallSpeed: 1,
-      speedCapMultiplier: 3,
-      rampDuration: 60,
+      speedCapMultiplier: 6,
+      rampDuration: 120,
     })
   })
 
@@ -518,6 +524,359 @@ describe('game core', () => {
     expect(next.shots).toHaveLength(1)
   })
 
+  it('spawns a Reinforced Line when the reinforce roll hits', () => {
+    const game = createGame(randomFrom([0.3, 0.9]))
+
+    expect(game.rows[0]?.reinforced).toBe(true)
+    expect(game.rows[0]?.cracked).toBe(false)
+    expect(game.rows[0]?.cells).toEqual(generatedCells(1))
+  })
+
+  it('spawns Reinforced Lines at roughly fifteen percent with injectable RNG', () => {
+    let reinforced = 0
+    for (let index = 0; index < 100; index += 1) {
+      const game = createGame(() => (index % 10) / 10)
+      if (game.rows[0]?.reinforced) reinforced += 1
+    }
+
+    expect(reinforced).toBeGreaterThanOrEqual(5)
+    expect(reinforced).toBeLessThanOrEqual(25)
+  })
+
+  it('clears a normal Frontline under a pre-filled Reinforced Line', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        { id: 1, y: 200, cells: generatedCells(1) },
+        {
+          id: 2,
+          y: 155,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
+    expect(game.score).toBe(0)
+
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(game.score).toBe(1)
+
+    game = {
+      ...game,
+      shots: [{ id: 100, column: 1, y: lowestFilledBottom(game) }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows).toHaveLength(1)
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows).toHaveLength(0)
+    expect(game.score).toBe(3)
+  })
+
+  it('keeps the empty-slot repeat cap when the next line is Reinforced', () => {
+    const random = randomFrom([0.3, 0, 0.3, 0, 0.3, 0.9])
+    const game = advanceGame(
+      startGame(createGameAtBaseFallSpeed(random)),
+      2,
+      random,
+    )
+    const newest = game.rows.reduce((lowest, row) =>
+      row.y < lowest.y ? row : lowest,
+    )
+
+    expect(newest.cells[1]).toBe(stone)
+    expect(newest.cells[2]).toBe(empty)
+    expect(newest.reinforced).toBe(true)
+  })
+
+  it('never marks a Partial Line as Reinforced', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [{ id: 1, y: 200, cells: generatedCells(1) }],
+      shots: [{ id: 99, column: 0, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const next = advanceGame(game, 0.001, () => 0)
+    const partial = next.rows.find((row) => row.y > 200)
+
+    expect(partial).toBeDefined()
+    expect(partial?.reinforced).toBeFalsy()
+  })
+
+  it('cracks an intact Reinforced Frontline without filling the empty slot', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const next = advanceGame(game, 0.001, () => 0)
+    const frontline = next.rows.find((row) => row.id === 1)
+
+    expect(next.shots).toHaveLength(0)
+    expect(frontline?.cracked).toBe(true)
+    expect(frontline?.cells[1]).toBe(empty)
+    expect(next.score).toBe(0)
+  })
+
+  it('fills then removes a Cracked Reinforced Frontline for a bonus point', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: true,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    const filled = game.rows.find((row) => row.id === 1)
+
+    expect(filled?.cells[1]).toBe(tnt)
+    expect(filled?.cracked).toBe(true)
+    expect(game.score).toBe(0)
+
+    game = advanceGame(game, 0.001, () => 0)
+
+    expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
+    expect(game.score).toBe(2)
+  })
+
+  it('passes through a Cracked Frontline to fill a higher same-column gap', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: true,
+        },
+        { id: 2, y: 155, cells: generatedCells(1) },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    game = advanceGame(game, 0.2, () => 0)
+
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+    expect(game.rows.find((row) => row.id === 1)?.cracked).toBe(true)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
+  })
+
+  it('places tnt on a higher intact Reinforced Line without Cracking it', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        { id: 1, y: 200, cells: generatedCells(1) },
+        {
+          id: 2,
+          y: 155,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    game = advanceGame(game, 0.2, () => 0)
+    const higher = game.rows.find((row) => row.id === 2)
+
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+    expect(higher?.cells[1]).toBe(tnt)
+    expect(higher?.cracked).toBe(false)
+    expect(higher?.reinforced).toBe(true)
+  })
+
+  it('cracks a complete Reinforced Line when it becomes the Frontline', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        { id: 1, y: 200, cells: generatedCells(1) },
+        {
+          id: 2,
+          y: 155,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
+
+    game = advanceGame(game, 0.001, () => 0)
+    const promoted = game.rows.find((row) => row.id === 2)
+
+    expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
+    expect(promoted?.cracked).toBe(true)
+    expect(promoted?.cells[1]).toBe(tnt)
+    expect(game.score).toBe(1)
+  })
+
+  it('removes a complete Cracked Frontline only from a Shot in the tnt column', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: true,
+          awaitingFinishingShot: true,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows).toHaveLength(1)
+    expect(game.score).toBe(0)
+
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows).toHaveLength(0)
+    expect(game.score).toBe(2)
+  })
+
+  it('stacks a Partial Line when a Shot misses the tnt column of a complete Cracked Frontline', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: [stone, tnt, stone, stone],
+          reinforced: true,
+          cracked: true,
+          awaitingFinishingShot: true,
+        },
+      ],
+      shots: [{ id: 99, column: 0, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    const next = advanceGame(game, 0.001, () => 0)
+    const partial = next.rows.find((row) => row.id !== 1)
+
+    expect(next.rows.find((row) => row.id === 1)).toBeDefined()
+    expect(partial?.cells[0]).toBe(tnt)
+    expect(next.score).toBe(0)
+  })
+
+  it('clears two stacked Reinforced Lines in the same column with four Shots', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      nextId: 200,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: false,
+        },
+        {
+          id: 2,
+          y: 155,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: false,
+        },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+
+    game = advanceGame(game, 0.001, () => 0)
+    game = advanceGame(game, 0.2, () => 0)
+    expect(game.rows.find((row) => row.id === 2)?.cells[1]).toBe(tnt)
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(false)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+
+    game = {
+      ...game,
+      shots: [{ id: 100, column: 1, y: lowestFilledBottom(game) }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)?.cracked).toBe(true)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(empty)
+
+    game = {
+      ...game,
+      shots: [{ id: 101, column: 1, y: lowestFilledBottom(game) }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
+    expect(game.score).toBe(0)
+
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
+    expect(game.rows.find((row) => row.id === 2)?.cracked).toBe(true)
+    expect(game.score).toBe(2)
+
+    game = {
+      ...game,
+      shots: [{ id: 102, column: 1, y: lowestFilledBottom(game) }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows).toHaveLength(1)
+    expect(game.score).toBe(2)
+
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 2)).toBeUndefined()
+    expect(game.score).toBe(4)
+  })
+
+  it('adds the Reinforced bonus on a two-line Cascade', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0))
+    game = {
+      ...game,
+      rows: [
+        {
+          id: 1,
+          y: 200,
+          cells: generatedCells(1),
+          reinforced: true,
+          cracked: true,
+        },
+        { id: 2, y: 155, cells: completeCells() },
+      ],
+      shots: [{ id: 99, column: 1, y: 200 + BLOCK_HEIGHT - 1 }],
+    }
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)?.cells[1]).toBe(tnt)
+
+    game = advanceGame(game, 0.001, () => 0)
+    expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
+    expect(game.rows.find((row) => row.id === 2)).toBeUndefined()
+    expect(game.score).toBe(4)
+  })
+
   it('returns the same state object for pause, game-over, and non-positive time', () => {
     const playing = startGame(createGameAtBaseFallSpeed(() => 0.3))
     expect(advanceGame(playing, 0, () => 0.3)).toBe(playing)
@@ -541,6 +900,11 @@ describe('game core', () => {
     expect(advanceGame(lost, 1, () => 0)).toBe(lost)
   })
 })
+
+function randomFrom(values: number[]) {
+  let index = 0
+  return () => values[index++] ?? 0
+}
 
 function createGameAtBaseFallSpeed(random: () => number) {
   return createGame(random, { speedCapMultiplier: 1 })

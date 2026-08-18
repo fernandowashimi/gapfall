@@ -2,6 +2,7 @@ import launchUrl from '../assets/audio/launch.wav'
 import detonateUrl from '../assets/audio/detonate.wav'
 import missUrl from '../assets/audio/miss.wav'
 import deathUrl from '../assets/audio/death.wav'
+import crackUrl from '../assets/audio/crack.wav'
 import type { FeedbackSound } from './cues'
 import {
   DEFAULT_AUDIO_VOLUME,
@@ -13,6 +14,7 @@ const soundUrls: Record<FeedbackSound, string> = {
   detonate: detonateUrl,
   miss: missUrl,
   death: deathUrl,
+  crack: crackUrl,
 }
 
 export interface GameAudio {

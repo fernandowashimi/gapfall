@@ -8,6 +8,14 @@ A portrait arcade game where a packed stream of generated lines falls toward the
 A four-column row with three occupied cells and one empty slot that enters from the top as part of the incoming stream.
 _Avoid_: obstacle, incoming row, spawn
 
+**Reinforced Line**:
+A Generated Line that a Shot can remove only while it is the Cracked Frontline.
+_Avoid_: reinforced block line, armored line, HP line
+
+**Cracked**:
+The state of a Reinforced Line after a Shot into its Frontline empty slot, or after it becomes the Frontline while already complete. A complete Cracked Frontline is removed by a Shot in the column that holds the tnt.
+_Avoid_: damaged, broken, weakened
+
 **Partial Line**:
 A row created or altered by a shot rather than spawned in the incoming stream.
 _Avoid_: player row, extra line, accumulated line

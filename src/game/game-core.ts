@@ -23,10 +23,15 @@ export type GamePhase = 'preparing' | 'playing' | 'paused' | 'game-over'
 /** Generated blocks are stone; Shot placements are tnt. */
 export type Cell = 'empty' | 'stone' | 'tnt'
 
+export const REINFORCED_SPAWN_CHANCE = 0.15
+
 export interface GameRow {
   id: number
   y: number
   cells: readonly Cell[]
+  reinforced?: boolean
+  cracked?: boolean
+  awaitingFinishingShot?: boolean
 }
 
 export function isOccupied(cell: Cell): boolean {
@@ -35,6 +40,13 @@ export function isOccupied(cell: Cell): boolean {
 
 export function isRowComplete(row: GameRow): boolean {
   return row.cells.every(isOccupied)
+}
+
+function isEligibleForRemoval(row: GameRow): boolean {
+  if (!isRowComplete(row)) return false
+  if (row.reinforced && !row.cracked) return false
+  if (row.reinforced && row.cracked && row.awaitingFinishingShot) return false
+  return true
 }
 
 export interface Shot {
@@ -160,10 +172,11 @@ export function advanceGame(
 
 function detonateEligibleRows(state: GameState): void {
   const cascade = removeEligibleRows(state.rows)
-  if (cascade.removed === 0) return
+  if (cascade.removed === 0 && cascade.rows === state.rows) return
 
   state.rows = cascade.rows
-  state.score += scoreForCascade(cascade.removed)
+  if (cascade.removed === 0) return
+  state.score += scoreForCascade(cascade.removed, cascade.reinforcedRemoved)
 }
 
 function resolveShotCollisions(state: GameState): void {
@@ -187,7 +200,26 @@ function resolveShotCollisions(state: GameState): void {
         continue
       }
 
+      if (target.reinforced && !target.cracked && target.id === frontline.id) {
+        rows = crackRow(rows, target.id)
+        continue
+      }
+
       rows = fillCell(rows, target.id, shot.column)
+      continue
+    }
+
+    if (
+      frontline.reinforced &&
+      frontline.cracked &&
+      frontline.awaitingFinishingShot &&
+      frontline.cells[shot.column] === 'tnt'
+    ) {
+      rows = rows.map((row) =>
+        row.id === frontline.id
+          ? { ...row, awaitingFinishingShot: false }
+          : row,
+      )
       continue
     }
 
@@ -245,21 +277,52 @@ function placeShotOnSolid(
 function removeEligibleRows(rows: readonly GameRow[]): {
   rows: GameRow[]
   removed: number
+  reinforcedRemoved: number
 } {
   const frontline = lowestRow(rows)
-  if (!frontline || !isRowComplete(frontline)) {
-    return { rows: rows as GameRow[], removed: 0 }
+  if (!frontline) {
+    return { rows: rows as GameRow[], removed: 0, reinforcedRemoved: 0 }
+  }
+
+  if (!isEligibleForRemoval(frontline)) {
+    if (
+      isRowComplete(frontline) &&
+      frontline.reinforced &&
+      !frontline.cracked
+    ) {
+      return {
+        rows: crackRow(rows, frontline.id, true),
+        removed: 0,
+        reinforcedRemoved: 0,
+      }
+    }
+    return { rows: rows as GameRow[], removed: 0, reinforcedRemoved: 0 }
   }
 
   const sorted = [...rows].sort((a, b) => b.y - a.y)
   let removed = 0
+  let reinforcedRemoved = 0
 
-  while (sorted[0] && isRowComplete(sorted[0])) {
+  while (sorted[0] && isEligibleForRemoval(sorted[0])) {
+    if (sorted[0].reinforced) reinforcedRemoved += 1
     sorted.shift()
     removed += 1
   }
 
-  return { rows: sorted, removed }
+  if (
+    sorted[0] &&
+    isRowComplete(sorted[0]) &&
+    sorted[0].reinforced &&
+    !sorted[0].cracked
+  ) {
+    sorted[0] = {
+      ...sorted[0],
+      cracked: true,
+      awaitingFinishingShot: true,
+    }
+  }
+
+  return { rows: sorted, removed, reinforcedRemoved }
 }
 
 function spawnRows(
@@ -344,8 +407,9 @@ function createGeneratedRow(
     gap = ((gap + 1) % COLUMN_COUNT) as Column
   const cells: Cell[] = ['stone', 'stone', 'stone', 'stone']
   cells[gap] = 'empty'
+  const reinforced = random() >= 1 - REINFORCED_SPAWN_CHANCE
   return [
-    { id, y, cells },
+    { id, y, cells, reinforced, cracked: false },
     gap,
     gap === previousGap ? consecutiveGapCount + 1 : 1,
   ]
@@ -364,6 +428,17 @@ function fillCell(
   })
 }
 
+function crackRow(
+  rows: readonly GameRow[],
+  rowId: number,
+  awaitingFinishingShot = false,
+): GameRow[] {
+  return rows.map((row) => {
+    if (row.id !== rowId) return row
+    return { ...row, cracked: true, awaitingFinishingShot }
+  })
+}
+
 function lowestRow(rows: readonly GameRow[]): GameRow | undefined {
   return rows.reduce<GameRow | undefined>(
     (lowest, row) => (!lowest || row.y > lowest.y ? row : lowest),
@@ -375,8 +450,9 @@ function nextRowId(rows: readonly GameRow[]): number {
   return rows.reduce((maximum, row) => Math.max(maximum, row.id), 0) + 1
 }
 
-function scoreForCascade(removed: number): number {
-  return removed === 0 ? 0 : removed * 2 - 1
+function scoreForCascade(removed: number, reinforcedRemoved = 0): number {
+  if (removed === 0) return 0
+  return removed * 2 - 1 + reinforcedRemoved
 }
 
 function approximatelyEqual(first: number, second: number): boolean {
