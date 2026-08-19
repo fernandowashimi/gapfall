@@ -10,7 +10,7 @@ describe('app-shell navigator', () => {
     })
   })
 
-  it('starts a Round from Play', () => {
+  it('starts a Single Player Round from Um jogador', () => {
     const result = reduceShell(createShellState(), { type: 'play' })
     expect(result).toEqual({
       state: {

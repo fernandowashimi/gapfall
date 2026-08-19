@@ -142,7 +142,7 @@ export default function App() {
             <span>recorde: {highScore}</span>
             <div className="menu-actions">
               <button type="button" onClick={() => dispatch({ type: 'play' })}>
-                Jogar
+                Um jogador
               </button>
               <button
                 type="button"
