@@ -933,17 +933,19 @@ describe('game core', () => {
     const top = game.rows.reduce((highest, row) =>
       row.y < highest.y ? row : highest,
     )
-    const existingYs = game.rows.map((row) => row.y)
+    const existingIds = new Set(game.rows.map((row) => row.id))
 
     game = stackExtraGeneratedLines(game, 2, () => 0.3)
 
-    const extras = game.rows.filter((row) => !existingYs.includes(row.y))
+    const extras = game.rows.filter((row) => !existingIds.has(row.id))
     expect(extras).toHaveLength(2)
     expect(extras.map((row) => row.y).sort((a, b) => b - a)).toEqual([
-      top.y - BLOCK_HEIGHT,
-      top.y - BLOCK_HEIGHT * 2,
+      top.y + BLOCK_HEIGHT,
+      top.y,
     ])
-    expect(game.rows.find((row) => row.id === top.id)?.y).toBe(top.y)
+    expect(game.rows.find((row) => row.id === top.id)?.y).toBe(
+      top.y + BLOCK_HEIGHT * 2,
+    )
   })
 
   it('makes extra Generated Lines 3+1 with the two-in-a-row empty-slot cap', () => {
@@ -1001,7 +1003,7 @@ describe('game core', () => {
     expect(game.linesRemoved).toBe(2)
   })
 
-  it('does not shove existing rows toward the Death Line when extra Generated Lines are stacked', () => {
+  it('shoves existing rows toward the Death Line when extra Generated Lines are stacked', () => {
     let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
     const frontline = game.rows[0]
     game = stackExtraGeneratedLines(game, 1, randomFrom([0.8, 0]))
@@ -1010,9 +1012,9 @@ describe('game core', () => {
     )
 
     expect(game.rows.find((row) => row.id === frontline?.id)?.y).toBe(
-      frontline?.y,
+      (frontline?.y ?? 0) + BLOCK_HEIGHT,
     )
-    expect(extra.y).toBe((frontline?.y ?? 0) - BLOCK_HEIGHT)
+    expect(extra.y).toBe(frontline?.y)
     expect(extra.cells[1]).toBe(stone)
 
     game = launchBlock(game, 1)

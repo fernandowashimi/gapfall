@@ -134,7 +134,11 @@ export function stackExtraGeneratedLines(
   let nextId = state.nextId
   let previousGap = state.previousGap
   let consecutiveGapCount = state.consecutiveGapCount
-  const rows = [...state.rows]
+  const shiftTowardDeathLine = count * BLOCK_HEIGHT
+  const rows = state.rows.map((row) => ({
+    ...row,
+    y: row.y + shiftTowardDeathLine,
+  }))
   let topY = topmostY(rows)
   if (!Number.isFinite(topY)) topY = 0
 

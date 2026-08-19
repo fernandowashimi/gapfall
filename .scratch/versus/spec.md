@@ -8,7 +8,7 @@ Gapfall is a local infinite Round. The player can only compete against the Fall 
 
 ## Solution
 
-Rename today’s Play to **Single Player** and add **Versus** on the Main Menu. Versus public-queues two anonymous players into a 1v1 Match. Each sees only their own board. Fall Speed holds at Base Fall Speed; there is no score. Each line a player removes instantly stacks an extra Generated Line packed above the opponent’s current top (a Cascade sends one per line). The last survivor wins. The Match room is the authority for death order and forfeits. After the Match ends: Rematch (hidden if the opponent is gone), Play again (requeue), or Main Menu.
+Rename today’s Play to **Single Player** and add **Versus** on the Main Menu. Versus public-queues two anonymous players into a 1v1 Match. Each sees only their own board. Fall Speed holds at Base Fall Speed; there is no score. Each line a player removes instantly stacks an extra Generated Line packed above the opponent’s current top and shoves existing rows toward the Death Line (a Cascade sends one per line). The last survivor wins. The Match room is the authority for death order and forfeits. After the Match ends: Rematch (hidden if the opponent is gone), Play again (requeue), or Main Menu.
 
 ## User Stories
 
@@ -28,7 +28,7 @@ Rename today’s Play to **Single Player** and add **Versus** on the Main Menu. 
 14. As a player, I want the Versus HUD to hide points, so that I am not playing a scored Round by accident.
 15. As a player, I want each line I remove to send one extra Generated Line to the opponent, so that clearing my board is also attacking theirs.
 16. As a player, I want a Cascade to send one extra Generated Line per removed line, so that a two-line Cascade sends two.
-17. As a player, I want those extra Generated Lines to stack packed above my opponent’s current top immediately, so that their pipeline grows without shoving existing rows toward the Death Line.
+17. As a player, I want those extra Generated Lines to appear immediately, packed above my opponent’s current top, shoving existing rows toward the Death Line so the attack is visible at once.
 18. As a player, I want a sent Generated Line to be a real Generated Line (3+1, same empty-slot cap, same chance to be Reinforced), so that I am not inventing a second line type.
 19. As a player, I want Partial Lines to stay my own misses, so that sent pressure is never a garbage row from a Shot.
 20. As a player, I want my empty-slot sequence to be independent of the opponent’s, so that we are not playing the same stream.
@@ -65,7 +65,7 @@ Rename today’s Play to **Single Player** and add **Versus** on the Main Menu. 
 
 - Respect ADR-0001: Single Player keeps the Fall Speed ramp and code knobs. Versus does not expose those knobs. Freeze Versus Fall Speed by creating the Round with `speedCapMultiplier: 1` so cap equals Base Fall Speed (do not set Ramp Duration to zero).
 - Respect ADR-0002: the game core owns board rules and commands only. React owns screens, HUD, input, Matchmaking UI, and the socket. Canvas draws public state. The core must not import WebSocket, PartySocket, or fetch.
-- Respect ADR-0003: extra Generated Lines do not collapse the board. They stack; they do not shove existing rows toward the Death Line.
+- Respect ADR-0003 for removals: a clear leaves empty space; remaining rows are not pulled down to close a gap. Extra Generated Lines are different: they shove existing rows toward the Death Line by N block-heights so the sent line occupies the previous top band and is visible immediately. They do not fill removal gaps.
 - Domain language from `CONTEXT.md`: **Single Player**, **Versus**, **Opponent**, **Matchmaking**, **Match**, **Generated Line**, **Cascade**, **Fall Speed**, **Base Fall Speed**, **Main Menu**, **Round**, **Death Line**. Do not ship Multiplayer, enemy, or Duel as product names.
 - Main Menu copy (Portuguese, matching existing overlays): today’s **Jogar** becomes **Um jogador**; add **Versus**; keep **Configurações**, **Instruções**, **recorde**, and the credit. High score remains the Single Player recorde.
 - Shell: keep Single Player on the existing Play intent (now the Um jogador action). Add a Versus intent that enters a Matchmaking mode/screen, not a Round. Cancel Matchmaking (Voltar / Esc) returns to the Main Menu and closes the queue socket. Pairing starts a Versus Round (`start` / remount with Versus Fall Speed config).
@@ -73,7 +73,7 @@ Rename today’s Play to **Single Player** and add **Versus** on the Main Menu. 
 - After the Match room broadcasts begin, each client mounts its own Round in `preparing` for the existing three seconds, then `playing`. Preparation is local and identical in duration, not a lockstep server clock.
 - Versus HUD is board-only: no score, no opponent-alive meter, no lines-sent counter. Single Player HUD is unchanged.
 - Versus never writes the local high score. Score may still exist on core state; the Versus HUD and Versus game-over must not show it, and a Versus Round must not update recorde.
-- Two independent cores. Empty-slot RNG is local `Math.random` (injectable in tests). The network message is a small JSON **lines-removed count** `N`, not a board snapshot. The receiving core applies an explicit command: stack `N` extra Generated Lines packed above the current topmost row (minimum `y`), using the same Generated Line factory as cadence spawn (3+1, two-in-a-row gap cap, 15% Reinforced). Cadence spawn stays locked to Fall Speed; if a cadence spawn would occupy the same `y` band as an extra line, it stacks packed above that stack so two Generated Lines never share a `y`.
+- Two independent cores. Empty-slot RNG is local `Math.random` (injectable in tests). The network message is a small JSON **lines-removed count** `N`, not a board snapshot. The receiving core applies an explicit command: stack `N` extra Generated Lines packed above the current topmost row (minimum `y`) and shove existing rows toward the Death Line by `N` block-heights, using the same Generated Line factory as cadence spawn (3+1, two-in-a-row gap cap, 15% Reinforced). Cadence spawn stays locked to Fall Speed; if a cadence spawn would occupy the same `y` band as an extra line, it stacks packed above that stack so two Generated Lines never share a `y`.
 - Advancing the simulation must report how many lines were removed that tick (Cascade size in lines, not score). The shell sends that `N` to the Match room when `N > 0`. Do not infer `N` from score (a two-line Cascade is not worth two points).
 - Hosting (from [Where Versus matchmaking and the death referee live](issues/01-versus-hosting.md)): **PartyKit room model on Cloudflare Durable Objects** (`partyserver` + WebSockets). A singleton `queue` party (well-known room, e.g. `public`) holds waiting sockets and, when two are present, mints a Match id and tells both to connect to a `match` party. The `match` party accepts exactly two connections, relays lines-removed, serializes death reports, and treats `onClose` during a live Round as a forfeit. Persist the declared outcome to room storage before broadcasting it. Hibernation stays off on Match rooms. During a Match, disable PartySocket’s default infinite reconnect (`maxRetries: 0` or equivalent) so a blip is a forfeit, not a ghost reconnect.
 - Who declares the winner: only the Match room. Clients report “I hit the Death Line.” The first death report is the loser; the other player wins. A later death report is ignored. Disconnect / abandon before outcome is a forfeit for that connection. Clients must not show Versus game-over until they receive the room’s outcome (win / loss, Death Line or forfeit). When outcome arrives, stop the local Round even if that client is still in `playing`.
@@ -90,7 +90,7 @@ Three seams, all pure functions. Do not test DOM, Canvas pixels, real WebSockets
 
 1. **Game core (existing, highest for board rules).** Drive `createGame` / `startGame` / `launchBlock` / `advanceGame` plus the new extra-Generated-Line command. Observe public rows, phase, Fall Speed behavior, and removed-line count. Prior art: `game-core.test.ts`. Cover at least:
    - Versus config (`speedCapMultiplier: 1`) holds Base Fall Speed over long Playing Time; Single Player default still ramps.
-   - Extra Generated Lines stack packed above the current top; they are 3+1; they respect the gap cap and can be Reinforced.
+   - Extra Generated Lines stack packed above the current top and shove existing rows toward the Death Line; they are 3+1; they respect the gap cap and can be Reinforced.
    - `N` extras stack `N` rows; a two-line Cascade reports removed count `2` (not score `3`).
    - Cadence spawn does not occupy the same `y` as an extra line.
    - Frontline-up, gaps remaining, Death Line, and pause helpers are unchanged when no extra lines are applied.
