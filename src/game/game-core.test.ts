@@ -6,6 +6,7 @@ import {
   isRowComplete,
   launchBlock,
   pauseGame,
+  stackExtraGeneratedLines,
   PLAYFIELD_HEIGHT,
   resumeGame,
   SHOT_SPEED,
@@ -909,6 +910,110 @@ describe('game core', () => {
     expect(game.rows.find((row) => row.id === 1)).toBeUndefined()
     expect(game.rows.find((row) => row.id === 2)).toBeUndefined()
     expect(game.score).toBe(4)
+  })
+
+  it('holds Base Fall Speed across long Playing Time when the Speed Cap equals Base Fall Speed', () => {
+    const travel = travelAfterPlayingTime(150, 0.001, { speedCapMultiplier: 1 })
+
+    expect(travel).toBeCloseTo(BLOCK_HEIGHT * 0.001)
+  })
+
+  it('stacks extra Generated Lines packed above the current topmost row', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    const top = game.rows.reduce((highest, row) =>
+      row.y < highest.y ? row : highest,
+    )
+    const existingYs = game.rows.map((row) => row.y)
+
+    game = stackExtraGeneratedLines(game, 2, () => 0.3)
+
+    const extras = game.rows.filter((row) => !existingYs.includes(row.y))
+    expect(extras).toHaveLength(2)
+    expect(extras.map((row) => row.y).sort((a, b) => b - a)).toEqual([
+      top.y - BLOCK_HEIGHT,
+      top.y - BLOCK_HEIGHT * 2,
+    ])
+    expect(game.rows.find((row) => row.id === top.id)?.y).toBe(top.y)
+  })
+
+  it('makes extra Generated Lines 3+1 with the two-in-a-row empty-slot cap', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = stackExtraGeneratedLines(game, 2, () => 0.3)
+    const extras = [...game.rows].sort((a, b) => b.y - a.y).slice(1)
+
+    expect(extras).toHaveLength(2)
+    for (const extra of extras) {
+      expect(extra.cells.filter((cell) => cell === empty)).toHaveLength(1)
+      expect(extra.cells.filter((cell) => cell === stone)).toHaveLength(3)
+    }
+    expect(extras[0]?.cells[1]).toBe(empty)
+    expect(extras[1]?.cells[1]).toBe(stone)
+    expect(extras[1]?.cells[2]).toBe(empty)
+  })
+
+  it('can spawn a Reinforced extra Generated Line', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = stackExtraGeneratedLines(game, 1, randomFrom([0.3, 0.9]))
+    const extra = game.rows.reduce((highest, row) =>
+      row.y < highest.y ? row : highest,
+    )
+
+    expect(extra.reinforced).toBe(true)
+    expect(extra.cracked).toBe(false)
+  })
+
+  it('stacks cadence Generated Lines packed above extra Generated Lines instead of sharing a y', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = stackExtraGeneratedLines(game, 1, () => 0.3)
+    game = advanceGame(game, 1, () => 0.3)
+    const positions = game.rows.map((row) => row.y).sort((a, b) => b - a)
+
+    expect(positions).toHaveLength(3)
+    expect(new Set(positions.map((y) => y.toFixed(3))).size).toBe(3)
+    expect(positions[0] - positions[1]).toBeCloseTo(BLOCK_HEIGHT)
+    expect(positions[1] - positions[2]).toBeCloseTo(BLOCK_HEIGHT)
+  })
+
+  it('reports two lines removed for a two-line Cascade, not the score of three', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    game = advanceGame(game, 1, () => 0.3)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.8)
+
+    expect(game.score).toBe(0)
+    expect(game.linesRemoved).toBe(0)
+
+    game = advanceGame(game, 0.001, () => 0.8)
+
+    expect(game.score).toBe(3)
+    expect(game.linesRemoved).toBe(2)
+  })
+
+  it('does not shove existing rows toward the Death Line when extra Generated Lines are stacked', () => {
+    let game = startGame(createGameAtBaseFallSpeed(() => 0.3))
+    const frontline = game.rows[0]
+    game = stackExtraGeneratedLines(game, 1, randomFrom([0.8, 0]))
+    const extra = game.rows.reduce((highest, row) =>
+      row.y < highest.y ? row : highest,
+    )
+
+    expect(game.rows.find((row) => row.id === frontline?.id)?.y).toBe(
+      frontline?.y,
+    )
+    expect(extra.y).toBe((frontline?.y ?? 0) - BLOCK_HEIGHT)
+    expect(extra.cells[1]).toBe(stone)
+
+    game = launchBlock(game, 1)
+    game = advanceGame(game, 1.5, () => 0.3)
+    const extraYBeforeClear = game.rows.find((row) => row.id === extra.id)?.y
+    game = advanceGame(game, 0.001, () => 0.3)
+
+    expect(game.rows.find((row) => row.id === frontline?.id)).toBeUndefined()
+    expect(game.rows.find((row) => row.id === extra.id)?.y).toBeCloseTo(
+      (extraYBeforeClear ?? 0) + BLOCK_HEIGHT * 0.001,
+    )
   })
 
   it('returns the same state object for pause, game-over, and non-positive time', () => {
