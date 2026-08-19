@@ -25,6 +25,7 @@ Standing locks — do not re-grill:
 - [Where Versus matchmaking and the death referee live](issues/01-versus-hosting.md) — PartyKit rooms on Cloudflare Durable Objects: a `queue` party pairs two anonymous sockets; a `match` party relays line-removed events and is the death/forfeit referee.
 - [Write the Versus spec](issues/07-write-versus-spec.md) — [`.scratch/versus/spec.md`](spec.md) is ready-for-agent.
 - [Game core Versus primitives](issues/08-game-core-versus-primitives.md) — `stackExtraGeneratedLines` packs extra Generated Lines above the current top; `advanceGame` reports per-tick `linesRemoved`; Versus Fall Speed is `speedCapMultiplier: 1`.
+- [Match referee](issues/09-match-referee.md) — pure `reduceQueue` / `reduceMatch` pair waiters, relay lines-removed, declare Death Line / forfeit, and handle Rematch votes without PartyKit.
 
 ## Not yet specified
 
