@@ -4,11 +4,15 @@
 
 **Blocked by:** [Versus Round (solo)](11-versus-round-solo.md)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Versus from the Main Menu enters Matchmaking, not a Round.
-- [ ] The loading state has no estimated wait and no timeout copy; it waits until pairing or cancel.
-- [ ] Voltar and Esc from Matchmaking return to the Main Menu without starting a Round.
-- [ ] A pairing intent/event starts a Versus Round (`start` with Versus Fall Speed), including the three-second preparation.
-- [ ] Cancel must be able to close a queue connection when one exists; with no adapter yet, the navigator still leaves Matchmaking cleanly.
-- [ ] App-shell tests cover Versus → Matchmaking → cancel/Esc, and pairing → Versus start. Single Player flow is unchanged.
+- [x] Versus from the Main Menu enters Matchmaking, not a Round.
+- [x] The loading state has no estimated wait and no timeout copy; it waits until pairing or cancel.
+- [x] Voltar and Esc from Matchmaking return to the Main Menu without starting a Round.
+- [x] A pairing intent/event starts a Versus Round (`start` with Versus Fall Speed), including the three-second preparation.
+- [x] Cancel must be able to close a queue connection when one exists; with no adapter yet, the navigator still leaves Matchmaking cleanly.
+- [x] App-shell tests cover Versus → Matchmaking → cancel/Esc, and pairing → Versus start. Single Player flow is unchanged.
+
+## Answer
+
+Versus from the Main Menu enters `matchmaking` with “Procurando oponente…” and **Voltar**. Cancel/Esc return home without `start`. A `paired` intent starts a Versus Round (`roundKind: 'versus'`, existing Fall Speed config and three-second preparation). No queue adapter yet; the navigator just leaves. Tests are in `src/ui/app-shell.test.ts`.

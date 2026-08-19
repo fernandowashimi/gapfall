@@ -28,6 +28,7 @@ Standing locks — do not re-grill:
 - [Match referee](issues/09-match-referee.md) — pure `reduceQueue` / `reduceMatch` pair waiters, relay lines-removed, declare Death Line / forfeit, and handle Rematch votes without PartyKit.
 - [Um jogador on the Main Menu](issues/10-um-jogador-main-menu.md) — Main Menu local play is **Um jogador**; it still `start`s today’s Single Player Round.
 - [Versus Round (solo)](issues/11-versus-round-solo.md) — Main Menu **Versus** starts a local Versus Round at Base Fall Speed: no score, no recorde, no pause, **Menu principal** to leave.
+- [Matchmaking shell](issues/12-matchmaking-shell.md) — Versus enters Matchmaking (“Procurando oponente…”, Voltar/Esc home); a `paired` intent starts the Versus Round.
 
 ## Not yet specified
 

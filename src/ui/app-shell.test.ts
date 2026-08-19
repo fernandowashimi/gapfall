@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createShellState, reduceShell } from './app-shell'
+import { createShellState, reduceShell, type ShellState } from './app-shell'
+
+function startVersusRound(): ShellState {
+  const matchmaking = reduceShell(createShellState(), { type: 'versus' }).state
+  return reduceShell(matchmaking, { type: 'paired' }).state
+}
 
 describe('app-shell navigator', () => {
   it('opens on the Main Menu', () => {
@@ -24,8 +29,24 @@ describe('app-shell navigator', () => {
     })
   })
 
-  it('starts a Versus Round from Versus', () => {
+  it('enters Matchmaking from Versus', () => {
     const result = reduceShell(createShellState(), { type: 'versus' })
+    expect(result).toEqual({
+      state: {
+        mode: 'matchmaking',
+        overlay: 'none',
+        settingsCaller: null,
+        roundKind: null,
+      },
+      effect: 'none',
+    })
+  })
+
+  it('starts a Versus Round when Matchmaking pairs', () => {
+    const matchmaking = reduceShell(createShellState(), {
+      type: 'versus',
+    }).state
+    const result = reduceShell(matchmaking, { type: 'paired' })
     expect(result).toEqual({
       state: {
         mode: 'round',
@@ -34,6 +55,21 @@ describe('app-shell navigator', () => {
         roundKind: 'versus',
       },
       effect: 'start',
+    })
+  })
+
+  it('returns to the Main Menu from Matchmaking on cancel or Esc', () => {
+    const matchmaking = reduceShell(createShellState(), {
+      type: 'versus',
+    }).state
+
+    expect(reduceShell(matchmaking, { type: 'cancel' })).toEqual({
+      state: createShellState(),
+      effect: 'none',
+    })
+    expect(reduceShell(matchmaking, { type: 'escape' })).toEqual({
+      state: createShellState(),
+      effect: 'none',
     })
   })
 
@@ -100,7 +136,7 @@ describe('app-shell navigator', () => {
   })
 
   it('does not open Settings from a Versus Round', () => {
-    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    const round = startVersusRound()
     expect(
       reduceShell(round, { type: 'open-settings', phase: 'playing' }),
     ).toEqual({ state: round, effect: 'none' })
@@ -136,7 +172,7 @@ describe('app-shell navigator', () => {
   })
 
   it('does not pause a Versus Round with Esc', () => {
-    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    const round = startVersusRound()
 
     expect(reduceShell(round, { type: 'escape', phase: 'preparing' })).toEqual({
       state: round,
@@ -161,7 +197,7 @@ describe('app-shell navigator', () => {
   })
 
   it('abandons a Versus Round to the Main Menu', () => {
-    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    const round = startVersusRound()
     expect(reduceShell(round, { type: 'abandon' })).toEqual({
       state: createShellState(),
       effect: 'none',
@@ -182,7 +218,7 @@ describe('app-shell navigator', () => {
   })
 
   it('does not remount a Versus Round on Play again', () => {
-    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    const round = startVersusRound()
     expect(
       reduceShell(round, { type: 'play-again', phase: 'game-over' }),
     ).toEqual({ state: round, effect: 'none' })

@@ -1,6 +1,6 @@
 import type { GamePhase } from '../game/game-core'
 
-export type ShellMode = 'main-menu' | 'round'
+export type ShellMode = 'main-menu' | 'round' | 'matchmaking'
 
 export type RoundKind = 'single-player' | 'versus'
 
@@ -18,6 +18,8 @@ export interface ShellState {
 export type ShellIntent =
   | { type: 'play' }
   | { type: 'versus' }
+  | { type: 'paired' }
+  | { type: 'cancel' }
   | { type: 'play-again'; phase?: GamePhase }
   | { type: 'open-instructions' }
   | { type: 'open-settings'; phase?: GamePhase }
@@ -48,10 +50,30 @@ export function reduceShell(
 ): ShellResult {
   switch (intent.type) {
     case 'play':
-      return startRoundFromMenu(state, 'single-player')
+      return startSinglePlayerFromMenu(state)
 
     case 'versus':
-      return startRoundFromMenu(state, 'versus')
+      if (state.mode !== 'main-menu' || state.overlay !== 'none') {
+        return noop(state)
+      }
+      return {
+        state: { ...createShellState(), mode: 'matchmaking' },
+        effect: 'none',
+      }
+
+    case 'paired':
+      if (state.mode !== 'matchmaking') return noop(state)
+      return {
+        state: clearOverlay({
+          ...state,
+          mode: 'round',
+          roundKind: 'versus',
+        }),
+        effect: 'start',
+      }
+
+    case 'cancel':
+      return leaveMatchmaking(state)
 
     case 'play-again':
       if (
@@ -102,6 +124,7 @@ export function reduceShell(
       if (state.overlay === 'settings' || state.overlay === 'instructions') {
         return closeOverlay(state)
       }
+      if (state.mode === 'matchmaking') return leaveMatchmaking(state)
       if (state.mode === 'main-menu') return noop(state)
       if (state.roundKind === 'versus') return noop(state)
       if (intent.phase === 'preparing' || intent.phase === 'playing') {
@@ -127,15 +150,21 @@ export function reduceShell(
   }
 }
 
-function startRoundFromMenu(
-  state: ShellState,
-  roundKind: RoundKind,
-): ShellResult {
+function leaveMatchmaking(state: ShellState): ShellResult {
+  if (state.mode !== 'matchmaking') return noop(state)
+  return { state: createShellState(), effect: 'none' }
+}
+
+function startSinglePlayerFromMenu(state: ShellState): ShellResult {
   if (state.mode !== 'main-menu' || state.overlay !== 'none') {
     return noop(state)
   }
   return {
-    state: clearOverlay({ ...state, mode: 'round', roundKind }),
+    state: clearOverlay({
+      ...state,
+      mode: 'round',
+      roundKind: 'single-player',
+    }),
     effect: 'start',
   }
 }

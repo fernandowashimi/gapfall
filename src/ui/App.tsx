@@ -194,6 +194,20 @@ export default function App() {
           </div>
         ) : null}
 
+        {shell.mode === 'matchmaking' ? (
+          <div
+            className="game-overlay menu-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Procurando oponente"
+          >
+            <span>Procurando oponente…</span>
+            <button type="button" onClick={() => dispatch({ type: 'cancel' })}>
+              Voltar
+            </button>
+          </div>
+        ) : null}
+
         {shell.overlay === 'instructions' ? (
           <div
             className="game-overlay menu-overlay"
