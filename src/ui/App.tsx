@@ -24,6 +24,8 @@ import {
   type RoundResult,
   type RoundSession,
 } from './round'
+import { connectMatch, connectQueue } from './versus-socket'
+import type { PartySocket } from 'partysocket'
 
 const REPO_URL = 'https://github.com/fernandowashimi/gapfall'
 
@@ -44,6 +46,7 @@ export default function App() {
   const [highScore, setHighScore] = useState(readHighScore)
   const [audioSettings, setAudioSettings] = useState(readAudioSettings)
   const [audio] = useState(() => createGameAudio(readAudioSettings()))
+  const matchSocketRef = useRef<PartySocket | null>(null)
 
   useEffect(() => {
     audio.applySettings(audioSettings)
@@ -73,12 +76,37 @@ export default function App() {
       audio.unsilence()
       sessionRef.current = null
       setHud(null)
+      matchSocketRef.current?.close()
+      matchSocketRef.current = null
     }
   }
   const dispatchRef = useRef(dispatch)
   useEffect(() => {
     dispatchRef.current = dispatch
   })
+
+  useEffect(() => {
+    if (shell.mode !== 'matchmaking') return
+
+    let match: PartySocket | null = null
+    const queue = connectQueue((matchId, playerId) => {
+      match?.close()
+      match = connectMatch(matchId, playerId)
+      match.addEventListener(
+        'open',
+        () => {
+          matchSocketRef.current?.close()
+          matchSocketRef.current = match
+          dispatchRef.current({ type: 'paired' })
+        },
+        { once: true },
+      )
+    })
+    return () => {
+      queue.close()
+      if (match && match !== matchSocketRef.current) match.close()
+    }
+  }, [shell.mode])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
