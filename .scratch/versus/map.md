@@ -30,6 +30,7 @@ Standing locks — do not re-grill:
 - [Versus Round (solo)](issues/11-versus-round-solo.md) — Main Menu **Versus** starts a local Versus Round at Base Fall Speed: no score, no recorde, no pause, **Menu principal** to leave.
 - [Matchmaking shell](issues/12-matchmaking-shell.md) — Versus enters Matchmaking (“Procurando oponente…”, Voltar/Esc home); a `paired` intent starts the Versus Round.
 - [Two-tab Match](issues/13-two-tab-match.md) — PartyServer `queue`/`match` rooms pair two tabs; React owns PartySocket; extra Match seats are rejected; Match sockets do not reconnect.
+- [Sent Generated Lines](issues/14-sent-generated-lines.md) — A Versus tick sends removed-line count `N` through the Match room; the Opponent stacks `N` extra Generated Lines on receipt. Single Player stays offline.
 
 ## Not yet specified
 

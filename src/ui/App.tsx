@@ -13,9 +13,11 @@ import {
 } from './audio-settings'
 import gapfallLogoUrl from '../assets/branding/gapfall-logo.png'
 import { VERSUS_FALL_SPEED } from '../game/game-core'
+import { decodeLinesRemoved, encodeLinesRemoved } from '../match/messages'
 import { GameCanvas } from './GameCanvas'
 import {
   applyAudioGate,
+  applySentGeneratedLines,
   createRound,
   hudOf,
   pauseRound,
@@ -85,6 +87,12 @@ export default function App() {
     dispatchRef.current = dispatch
   })
 
+  const applySentGeneratedLinesRef = useRef((n: number) => {
+    const session = sessionRef.current
+    if (!session) return
+    sessionRef.current = applySentGeneratedLines(session, n)
+  })
+
   useEffect(() => {
     if (shell.mode !== 'matchmaking') return
 
@@ -92,6 +100,11 @@ export default function App() {
     const queue = connectQueue((matchId, playerId) => {
       match?.close()
       match = connectMatch(matchId, playerId)
+      match.addEventListener('message', (event) => {
+        const message = decodeLinesRemoved(String(event.data))
+        if (!message) return
+        applySentGeneratedLinesRef.current(message.n)
+      })
       match.addEventListener(
         'open',
         () => {
@@ -169,6 +182,11 @@ export default function App() {
               audio={audio}
               sessionRef={sessionRef}
               onHudChange={handleHudChange}
+              onLinesRemoved={
+                versusRound
+                  ? (n) => matchSocketRef.current?.send(encodeLinesRemoved(n))
+                  : undefined
+              }
               pauseWhenHidden={!versusRound}
             />
           </>

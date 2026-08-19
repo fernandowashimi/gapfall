@@ -5,6 +5,7 @@ import {
   launchBlock,
   pauseGame,
   resumeGame,
+  stackExtraGeneratedLines,
   type Column,
   type FallSpeedConfig,
   type GameState,
@@ -34,6 +35,7 @@ export interface RoundResult {
   sounds: readonly FeedbackSound[]
   audioGate: AudioGate
   hudChanged: boolean
+  linesRemoved: number
 }
 
 export function createRound(
@@ -43,6 +45,17 @@ export function createRound(
   return {
     game: createGame(random, fallSpeedConfig),
     detonations: [],
+  }
+}
+
+export function applySentGeneratedLines(
+  session: RoundSession,
+  count: number,
+  random: () => number = Math.random,
+): RoundSession {
+  return {
+    game: stackExtraGeneratedLines(session.game, count, random),
+    detonations: session.detonations,
   }
 }
 
@@ -70,6 +83,7 @@ export function tickRound(
       [],
       audioGateFor(previousHud.phase, session.game.phase),
       previousHud,
+      0,
     )
   }
 
@@ -92,6 +106,7 @@ export function tickRound(
     cues.sounds,
     audioGateFor(previousHud.phase, game.phase),
     previousHud,
+    game.linesRemoved,
   )
 }
 
@@ -102,7 +117,7 @@ export function launchRound(
   const previousHud = hudOf(session)
   const game = launchBlock(session.game, column)
   if (game.phase !== 'playing') {
-    return roundResult(session, [], 'unchanged', previousHud)
+    return roundResult(session, [], 'unchanged', previousHud, 0)
   }
 
   const cues = readCues(session.game, game)
@@ -115,6 +130,7 @@ export function launchRound(
     cues.sounds,
     'unchanged',
     previousHud,
+    0,
   )
 }
 
@@ -126,6 +142,7 @@ export function pauseRound(session: RoundSession): RoundResult {
     [],
     audioGateFor(previousHud.phase, game.phase),
     previousHud,
+    0,
   )
 }
 
@@ -137,6 +154,7 @@ export function resumeRound(session: RoundSession): RoundResult {
     [],
     audioGateFor(previousHud.phase, game.phase),
     previousHud,
+    0,
   )
 }
 
@@ -145,6 +163,7 @@ function roundResult(
   sounds: readonly FeedbackSound[],
   audioGate: AudioGate,
   previousHud: RoundHud,
+  linesRemoved: number,
 ): RoundResult {
   const hud = hudOf(session)
   return {
@@ -153,6 +172,7 @@ function roundResult(
     audioGate,
     hudChanged:
       hud.score !== previousHud.score || hud.phase !== previousHud.phase,
+    linesRemoved,
   }
 }
 

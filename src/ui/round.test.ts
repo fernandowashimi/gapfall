@@ -260,6 +260,7 @@ describe('Round commands', () => {
     expect(later.sounds).toEqual([])
     expect(later.session.game).toBe(lost.session.game)
     expect(later.hudChanged).toBe(false)
+    expect(later.linesRemoved).toBe(0)
   })
 })
 

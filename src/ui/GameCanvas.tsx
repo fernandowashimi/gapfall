@@ -35,6 +35,7 @@ import {
 interface GameCanvasProps {
   sessionRef: MutableRefObject<RoundSession | null>
   onHudChange: (hud: RoundHud) => void
+  onLinesRemoved?: (n: number) => void
   audio: GameAudio
   pauseWhenHidden?: boolean
 }
@@ -44,6 +45,7 @@ const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
 export function GameCanvas({
   sessionRef,
   onHudChange,
+  onLinesRemoved,
   audio,
   pauseWhenHidden = true,
 }: GameCanvasProps) {
@@ -52,6 +54,7 @@ export function GameCanvas({
   const spritesRef = useRef<GameSprites | null>(null)
   const audioRef = useRef(audio)
   const onHudChangeRef = useRef(onHudChange)
+  const onLinesRemovedRef = useRef(onLinesRemoved)
 
   useEffect(() => {
     audioRef.current = audio
@@ -60,6 +63,10 @@ export function GameCanvas({
   useEffect(() => {
     onHudChangeRef.current = onHudChange
   }, [onHudChange])
+
+  useEffect(() => {
+    onLinesRemovedRef.current = onLinesRemoved
+  }, [onLinesRemoved])
 
   useEffect(() => {
     let cancelled = false
@@ -92,6 +99,9 @@ export function GameCanvas({
       const current = sessionRef.current
       if (current) {
         const result = tickRound(current, delta)
+        if (result.linesRemoved > 0) {
+          onLinesRemovedRef.current?.(result.linesRemoved)
+        }
         commitRound(sessionRef, result, audioRef.current, onHudChangeRef)
         drawGame(
           context,
