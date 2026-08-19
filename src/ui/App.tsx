@@ -12,6 +12,7 @@ import {
   type AudioSettings,
 } from './audio-settings'
 import gapfallLogoUrl from '../assets/branding/gapfall-logo.png'
+import { VERSUS_FALL_SPEED } from '../game/game-core'
 import { GameCanvas } from './GameCanvas'
 import {
   applyAudioGate,
@@ -56,7 +57,10 @@ export default function App() {
 
     if (result.effect === 'start' || result.effect === 'remount') {
       audio.unsilence()
-      const session = createRound()
+      const session = createRound(
+        undefined,
+        result.state.roundKind === 'versus' ? VERSUS_FALL_SPEED : undefined,
+      )
       sessionRef.current = session
       setHud(hudOf(session))
     } else if (result.effect === 'pause') {
@@ -93,6 +97,7 @@ export default function App() {
     hudRef.current = nextHud
     setHud(nextHud)
     setHighScore((currentHighScore) => {
+      if (shellRef.current.roundKind === 'versus') return currentHighScore
       if (nextHud.score <= currentHighScore) return currentHighScore
       localStorage.setItem('gapfall:high-score', String(nextHud.score))
       return nextHud.score
@@ -100,8 +105,12 @@ export default function App() {
   }
 
   const inRound = shell.mode === 'round'
+  const versusRound = inRound && shell.roundKind === 'versus'
   const showPause =
-    inRound && hud?.phase === 'paused' && shell.overlay !== 'settings'
+    inRound &&
+    !versusRound &&
+    hud?.phase === 'paused' &&
+    shell.overlay !== 'settings'
   const showGameOver =
     inRound && hud?.phase === 'game-over' && shell.overlay === 'none'
 
@@ -113,15 +122,26 @@ export default function App() {
             <header className="game-hud">
               <div>
                 <p className="eyebrow">Gapfall</p>
-                <h1>
-                  Score <span>{hud?.score ?? 0}</span>
-                </h1>
+                {versusRound ? null : (
+                  <h1>
+                    Score <span>{hud?.score ?? 0}</span>
+                  </h1>
+                )}
               </div>
+              {versusRound && hud?.phase !== 'game-over' ? (
+                <button
+                  type="button"
+                  onClick={() => dispatch({ type: 'abandon' })}
+                >
+                  Menu principal
+                </button>
+              ) : null}
             </header>
             <GameCanvas
               audio={audio}
               sessionRef={sessionRef}
               onHudChange={handleHudChange}
+              pauseWhenHidden={!versusRound}
             />
           </>
         ) : null}
@@ -143,6 +163,12 @@ export default function App() {
             <div className="menu-actions">
               <button type="button" onClick={() => dispatch({ type: 'play' })}>
                 Um jogador
+              </button>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'versus' })}
+              >
+                Versus
               </button>
               <button
                 type="button"
@@ -224,21 +250,27 @@ export default function App() {
             aria-label="Fim de jogo"
           >
             <p className="eyebrow">FIM DE JOGO</p>
-            <strong>{hud?.score ?? 0}</strong>
-            <span>pontos</span>
-            <span>recorde: {highScore}</span>
+            {versusRound ? null : (
+              <>
+                <strong>{hud?.score ?? 0}</strong>
+                <span>pontos</span>
+                <span>recorde: {highScore}</span>
+              </>
+            )}
             <div className="menu-actions">
-              <button
-                type="button"
-                onClick={() =>
-                  dispatch({
-                    type: 'play-again',
-                    phase: hud?.phase,
-                  })
-                }
-              >
-                Jogar novamente
-              </button>
+              {versusRound ? null : (
+                <button
+                  type="button"
+                  onClick={() =>
+                    dispatch({
+                      type: 'play-again',
+                      phase: hud?.phase,
+                    })
+                  }
+                >
+                  Jogar novamente
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => dispatch({ type: 'abandon' })}

@@ -18,6 +18,10 @@ export const DEFAULT_FALL_SPEED: FallSpeedConfig = {
   rampDuration: 120,
 }
 
+export const VERSUS_FALL_SPEED: Partial<FallSpeedConfig> = {
+  speedCapMultiplier: 1,
+}
+
 export type Column = 0 | 1 | 2 | 3
 export type GamePhase = 'preparing' | 'playing' | 'paused' | 'game-over'
 /** Generated blocks are stone; Shot placements are tnt. */

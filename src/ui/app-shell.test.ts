@@ -7,6 +7,7 @@ describe('app-shell navigator', () => {
       mode: 'main-menu',
       overlay: 'none',
       settingsCaller: null,
+      roundKind: null,
     })
   })
 
@@ -17,13 +18,29 @@ describe('app-shell navigator', () => {
         mode: 'round',
         overlay: 'none',
         settingsCaller: null,
+        roundKind: 'single-player',
+      },
+      effect: 'start',
+    })
+  })
+
+  it('starts a Versus Round from Versus', () => {
+    const result = reduceShell(createShellState(), { type: 'versus' })
+    expect(result).toEqual({
+      state: {
+        mode: 'round',
+        overlay: 'none',
+        settingsCaller: null,
+        roundKind: 'versus',
       },
       effect: 'start',
     })
   })
 
   it('opens Instructions from the Main Menu and returns on close or Esc', () => {
-    const opened = reduceShell(createShellState(), { type: 'open-instructions' })
+    const opened = reduceShell(createShellState(), {
+      type: 'open-instructions',
+    })
     expect(opened.state.overlay).toBe('instructions')
     expect(opened.effect).toBe('none')
 
@@ -41,6 +58,7 @@ describe('app-shell navigator', () => {
       mode: 'main-menu',
       overlay: 'settings',
       settingsCaller: 'main-menu',
+      roundKind: null,
     })
 
     expect(reduceShell(opened.state, { type: 'close-overlay' }).state).toEqual(
@@ -61,6 +79,7 @@ describe('app-shell navigator', () => {
       mode: 'round',
       overlay: 'settings',
       settingsCaller: 'pause',
+      roundKind: 'single-player',
     })
 
     const closed = reduceShell(opened.state, { type: 'escape' })
@@ -68,6 +87,7 @@ describe('app-shell navigator', () => {
       mode: 'round',
       overlay: 'none',
       settingsCaller: null,
+      roundKind: 'single-player',
     })
     expect(closed.effect).toBe('none')
   })
@@ -79,6 +99,16 @@ describe('app-shell navigator', () => {
     ).toEqual({ state: round, effect: 'none' })
   })
 
+  it('does not open Settings from a Versus Round', () => {
+    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    expect(
+      reduceShell(round, { type: 'open-settings', phase: 'playing' }),
+    ).toEqual({ state: round, effect: 'none' })
+    expect(
+      reduceShell(round, { type: 'open-settings', phase: 'paused' }),
+    ).toEqual({ state: round, effect: 'none' })
+  })
+
   it('ignores Esc on the Main Menu', () => {
     const result = reduceShell(createShellState(), { type: 'escape' })
     expect(result).toEqual({ state: createShellState(), effect: 'none' })
@@ -87,9 +117,10 @@ describe('app-shell navigator', () => {
   it('pauses and resumes a Round with Esc', () => {
     const round = reduceShell(createShellState(), { type: 'play' }).state
 
-    expect(
-      reduceShell(round, { type: 'escape', phase: 'preparing' }),
-    ).toEqual({ state: round, effect: 'pause' })
+    expect(reduceShell(round, { type: 'escape', phase: 'preparing' })).toEqual({
+      state: round,
+      effect: 'pause',
+    })
     expect(reduceShell(round, { type: 'escape', phase: 'playing' })).toEqual({
       state: round,
       effect: 'pause',
@@ -98,9 +129,23 @@ describe('app-shell navigator', () => {
       state: round,
       effect: 'resume',
     })
-    expect(
-      reduceShell(round, { type: 'escape', phase: 'game-over' }),
-    ).toEqual({ state: round, effect: 'none' })
+    expect(reduceShell(round, { type: 'escape', phase: 'game-over' })).toEqual({
+      state: round,
+      effect: 'none',
+    })
+  })
+
+  it('does not pause a Versus Round with Esc', () => {
+    const round = reduceShell(createShellState(), { type: 'versus' }).state
+
+    expect(reduceShell(round, { type: 'escape', phase: 'preparing' })).toEqual({
+      state: round,
+      effect: 'none',
+    })
+    expect(reduceShell(round, { type: 'escape', phase: 'playing' })).toEqual({
+      state: round,
+      effect: 'none',
+    })
   })
 
   it('abandons a Round to the Main Menu', () => {
@@ -110,6 +155,14 @@ describe('app-shell navigator', () => {
       phase: 'paused',
     }).state
     expect(reduceShell(settings, { type: 'abandon' })).toEqual({
+      state: createShellState(),
+      effect: 'none',
+    })
+  })
+
+  it('abandons a Versus Round to the Main Menu', () => {
+    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    expect(reduceShell(round, { type: 'abandon' })).toEqual({
       state: createShellState(),
       effect: 'none',
     })
@@ -126,6 +179,13 @@ describe('app-shell navigator', () => {
       state: round,
       effect: 'remount',
     })
+  })
+
+  it('does not remount a Versus Round on Play again', () => {
+    const round = reduceShell(createShellState(), { type: 'versus' }).state
+    expect(
+      reduceShell(round, { type: 'play-again', phase: 'game-over' }),
+    ).toEqual({ state: round, effect: 'none' })
   })
 
   it('resumes from the pause overlay action', () => {

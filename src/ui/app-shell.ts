@@ -2,6 +2,8 @@ import type { GamePhase } from '../game/game-core'
 
 export type ShellMode = 'main-menu' | 'round'
 
+export type RoundKind = 'single-player' | 'versus'
+
 export type ShellOverlay = 'none' | 'instructions' | 'settings'
 
 export type SettingsCaller = 'main-menu' | 'pause'
@@ -10,10 +12,12 @@ export interface ShellState {
   mode: ShellMode
   overlay: ShellOverlay
   settingsCaller: SettingsCaller | null
+  roundKind: RoundKind | null
 }
 
 export type ShellIntent =
   | { type: 'play' }
+  | { type: 'versus' }
   | { type: 'play-again'; phase?: GamePhase }
   | { type: 'open-instructions' }
   | { type: 'open-settings'; phase?: GamePhase }
@@ -34,6 +38,7 @@ export function createShellState(): ShellState {
     mode: 'main-menu',
     overlay: 'none',
     settingsCaller: null,
+    roundKind: null,
   }
 }
 
@@ -43,16 +48,17 @@ export function reduceShell(
 ): ShellResult {
   switch (intent.type) {
     case 'play':
-      if (state.mode !== 'main-menu' || state.overlay !== 'none') {
-        return noop(state)
-      }
-      return {
-        state: clearOverlay({ ...state, mode: 'round' }),
-        effect: 'start',
-      }
+      return startRoundFromMenu(state, 'single-player')
+
+    case 'versus':
+      return startRoundFromMenu(state, 'versus')
 
     case 'play-again':
-      if (state.mode !== 'round' || intent.phase !== 'game-over') {
+      if (
+        state.mode !== 'round' ||
+        state.roundKind !== 'single-player' ||
+        intent.phase !== 'game-over'
+      ) {
         return noop(state)
       }
       return { state: clearOverlay(state), effect: 'remount' }
@@ -68,6 +74,7 @@ export function reduceShell(
 
     case 'open-settings':
       if (state.overlay !== 'none') return noop(state)
+      if (state.roundKind === 'versus') return noop(state)
       if (state.mode === 'main-menu') {
         return {
           state: {
@@ -96,6 +103,7 @@ export function reduceShell(
         return closeOverlay(state)
       }
       if (state.mode === 'main-menu') return noop(state)
+      if (state.roundKind === 'versus') return noop(state)
       if (intent.phase === 'preparing' || intent.phase === 'playing') {
         return { state, effect: 'pause' }
       }
@@ -116,6 +124,19 @@ export function reduceShell(
 
     default:
       return noop(state)
+  }
+}
+
+function startRoundFromMenu(
+  state: ShellState,
+  roundKind: RoundKind,
+): ShellResult {
+  if (state.mode !== 'main-menu' || state.overlay !== 'none') {
+    return noop(state)
+  }
+  return {
+    state: clearOverlay({ ...state, mode: 'round', roundKind }),
+    effect: 'start',
   }
 }
 

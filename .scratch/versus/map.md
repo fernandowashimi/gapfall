@@ -27,6 +27,7 @@ Standing locks — do not re-grill:
 - [Game core Versus primitives](issues/08-game-core-versus-primitives.md) — `stackExtraGeneratedLines` packs extra Generated Lines above the current top; `advanceGame` reports per-tick `linesRemoved`; Versus Fall Speed is `speedCapMultiplier: 1`.
 - [Match referee](issues/09-match-referee.md) — pure `reduceQueue` / `reduceMatch` pair waiters, relay lines-removed, declare Death Line / forfeit, and handle Rematch votes without PartyKit.
 - [Um jogador on the Main Menu](issues/10-um-jogador-main-menu.md) — Main Menu local play is **Um jogador**; it still `start`s today’s Single Player Round.
+- [Versus Round (solo)](issues/11-versus-round-solo.md) — Main Menu **Versus** starts a local Versus Round at Base Fall Speed: no score, no recorde, no pause, **Menu principal** to leave.
 
 ## Not yet specified
 

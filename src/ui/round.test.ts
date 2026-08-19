@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
   BLOCK_HEIGHT,
+  DEFAULT_FALL_SPEED,
   PLAYFIELD_HEIGHT,
+  VERSUS_FALL_SPEED,
   type Cell,
   type Column,
 } from '../game/game-core'
@@ -20,6 +22,16 @@ describe('Round commands', () => {
     expect(session.game.phase).toBe('preparing')
     expect(session.game.score).toBe(0)
     expect(session.detonations).toEqual([])
+  })
+
+  it('creates a Versus Round with Base Fall Speed as the Speed Cap', () => {
+    const session = createRound(() => 0.3, VERSUS_FALL_SPEED)
+
+    expect(session.game.phase).toBe('preparing')
+    expect(session.game.fallSpeedConfig.speedCapMultiplier).toBe(1)
+    expect(session.game.fallSpeedConfig.rampDuration).toBe(
+      DEFAULT_FALL_SPEED.rampDuration,
+    )
   })
 
   it('ticks past preparation into playing', () => {

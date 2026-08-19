@@ -6,6 +6,7 @@ import {
   pauseGame,
   resumeGame,
   type Column,
+  type FallSpeedConfig,
   type GameState,
 } from '../game/game-core'
 import { readCues, type DetonationCue, type FeedbackSound } from './cues'
@@ -35,9 +36,12 @@ export interface RoundResult {
   hudChanged: boolean
 }
 
-export function createRound(random?: () => number): RoundSession {
+export function createRound(
+  random?: () => number,
+  fallSpeedConfig?: Partial<FallSpeedConfig>,
+): RoundSession {
   return {
-    game: createGame(random),
+    game: createGame(random, fallSpeedConfig),
     detonations: [],
   }
 }

@@ -36,6 +36,7 @@ interface GameCanvasProps {
   sessionRef: MutableRefObject<RoundSession | null>
   onHudChange: (hud: RoundHud) => void
   audio: GameAudio
+  pauseWhenHidden?: boolean
 }
 
 const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
@@ -44,6 +45,7 @@ export function GameCanvas({
   sessionRef,
   onHudChange,
   audio,
+  pauseWhenHidden = true,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fpsRef = useRef<HTMLDivElement>(null)
@@ -128,7 +130,7 @@ export function GameCanvas({
     }
     const handleVisibility = () => {
       const current = sessionRef.current
-      if (!current || !document.hidden) return
+      if (!pauseWhenHidden || !current || !document.hidden) return
       commitRound(
         sessionRef,
         pauseRound(current),
@@ -137,6 +139,7 @@ export function GameCanvas({
       )
     }
     const handleBlur = () => {
+      if (!pauseWhenHidden) return
       const current = sessionRef.current
       if (!current) return
       commitRound(
@@ -155,7 +158,7 @@ export function GameCanvas({
       window.removeEventListener('blur', handleBlur)
       document.removeEventListener('visibilitychange', handleVisibility)
     }
-  }, [sessionRef])
+  }, [sessionRef, pauseWhenHidden])
 
   const handlePointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
     const current = sessionRef.current
