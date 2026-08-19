@@ -1,6 +1,7 @@
 import {
   advanceGame,
   createGame,
+  endGame,
   isRowComplete,
   launchBlock,
   pauseGame,
@@ -141,6 +142,23 @@ export function pauseRound(session: RoundSession): RoundResult {
     { game, detonations: session.detonations },
     [],
     audioGateFor(previousHud.phase, game.phase),
+    previousHud,
+    0,
+  )
+}
+
+export function stopRound(session: RoundSession): RoundResult {
+  const previousHud = hudOf(session)
+  if (previousHud.phase === 'game-over') {
+    return roundResult(session, [], 'unchanged', previousHud, 0)
+  }
+  return roundResult(
+    {
+      game: endGame(session.game),
+      detonations: session.detonations,
+    },
+    [],
+    'unchanged',
     previousHud,
     0,
   )

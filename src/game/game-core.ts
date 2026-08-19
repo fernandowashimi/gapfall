@@ -120,6 +120,10 @@ export function resumeGame(state: GameState): GameState {
   return state.phase === 'paused' ? { ...state, phase: 'playing' } : state
 }
 
+export function endGame(state: GameState): GameState {
+  return state.phase === 'game-over' ? state : { ...state, phase: 'game-over' }
+}
+
 export function stackExtraGeneratedLines(
   state: GameState,
   count: number,

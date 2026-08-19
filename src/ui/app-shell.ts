@@ -13,6 +13,13 @@ export interface ShellState {
   overlay: ShellOverlay
   settingsCaller: SettingsCaller | null
   roundKind: RoundKind | null
+  versusOutcome: VersusOutcome | null
+}
+
+export type VersusOutcome = {
+  result: 'win' | 'loss'
+  reason: 'death-line' | 'forfeit'
+  rematchAvailable: boolean
 }
 
 export type ShellIntent =
@@ -27,8 +34,16 @@ export type ShellIntent =
   | { type: 'escape'; phase?: GamePhase }
   | { type: 'resume' }
   | { type: 'abandon' }
+  | {
+      type: 'outcome'
+      result: VersusOutcome['result']
+      reason: VersusOutcome['reason']
+    }
+  | { type: 'rematch-unavailable' }
+  | { type: 'rematch-begin' }
 
-export type RoundEffect = 'none' | 'start' | 'remount' | 'pause' | 'resume'
+export type RoundEffect =
+  'none' | 'start' | 'remount' | 'pause' | 'resume' | 'stop'
 
 export interface ShellResult {
   state: ShellState
@@ -41,6 +56,7 @@ export function createShellState(): ShellState {
     overlay: 'none',
     settingsCaller: null,
     roundKind: null,
+    versusOutcome: null,
   }
 }
 
@@ -76,11 +92,15 @@ export function reduceShell(
       return leaveMatchmaking(state)
 
     case 'play-again':
-      if (
-        state.mode !== 'round' ||
-        state.roundKind !== 'single-player' ||
-        intent.phase !== 'game-over'
-      ) {
+      if (state.mode !== 'round') return noop(state)
+      if (state.roundKind === 'versus') {
+        if (!state.versusOutcome) return noop(state)
+        return {
+          state: { ...createShellState(), mode: 'matchmaking' },
+          effect: 'none',
+        }
+      }
+      if (state.roundKind !== 'single-player' || intent.phase !== 'game-over') {
         return noop(state)
       }
       return { state: clearOverlay(state), effect: 'remount' }
@@ -144,6 +164,45 @@ export function reduceShell(
     case 'abandon':
       if (state.mode !== 'round') return noop(state)
       return { state: createShellState(), effect: 'none' }
+
+    case 'outcome':
+      if (
+        state.mode !== 'round' ||
+        state.roundKind !== 'versus' ||
+        state.versusOutcome
+      ) {
+        return noop(state)
+      }
+      return {
+        state: {
+          ...state,
+          versusOutcome: {
+            result: intent.result,
+            reason: intent.reason,
+            rematchAvailable: intent.reason !== 'forfeit',
+          },
+        },
+        effect: 'stop',
+      }
+
+    case 'rematch-unavailable':
+      if (!state.versusOutcome?.rematchAvailable) return noop(state)
+      return {
+        state: {
+          ...state,
+          versusOutcome: { ...state.versusOutcome, rematchAvailable: false },
+        },
+        effect: 'none',
+      }
+
+    case 'rematch-begin':
+      if (state.mode !== 'round' || state.roundKind !== 'versus') {
+        return noop(state)
+      }
+      return {
+        state: { ...state, versusOutcome: null },
+        effect: 'start',
+      }
 
     default:
       return noop(state)

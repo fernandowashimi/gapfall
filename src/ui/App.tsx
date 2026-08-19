@@ -13,7 +13,15 @@ import {
 } from './audio-settings'
 import gapfallLogoUrl from '../assets/branding/gapfall-logo.png'
 import { VERSUS_FALL_SPEED } from '../game/game-core'
-import { decodeLinesRemoved, encodeLinesRemoved } from '../match/messages'
+import {
+  decodeLinesRemoved,
+  decodeOutcome,
+  decodeRematchBegin,
+  decodeRematchUnavailable,
+  encodeDeath,
+  encodeLinesRemoved,
+  encodeRematch,
+} from '../match/messages'
 import { GameCanvas } from './GameCanvas'
 import {
   applyAudioGate,
@@ -22,6 +30,7 @@ import {
   hudOf,
   pauseRound,
   resumeRound,
+  stopRound,
   type RoundHud,
   type RoundResult,
   type RoundSession,
@@ -72,9 +81,14 @@ export default function App() {
       applyRoundCommand(sessionRef, pauseRound, audio, setHud)
     } else if (result.effect === 'resume') {
       applyRoundCommand(sessionRef, resumeRound, audio, setHud)
+    } else if (result.effect === 'stop') {
+      applyRoundCommand(sessionRef, stopRound, audio, setHud)
     }
 
-    if (intent.type === 'abandon') {
+    if (
+      intent.type === 'abandon' ||
+      (intent.type === 'play-again' && result.state.mode === 'matchmaking')
+    ) {
       audio.unsilence()
       sessionRef.current = null
       setHud(null)
@@ -101,9 +115,30 @@ export default function App() {
       match?.close()
       match = connectMatch(matchId, playerId)
       match.addEventListener('message', (event) => {
-        const message = decodeLinesRemoved(String(event.data))
-        if (!message) return
-        applySentGeneratedLinesRef.current(message.n)
+        const raw = String(event.data)
+        const lines = decodeLinesRemoved(raw)
+        if (lines) {
+          applySentGeneratedLinesRef.current(lines.n)
+          return
+        }
+        const outcome = decodeOutcome(raw)
+        if (outcome) {
+          const selfId = match?.id
+          if (!selfId) return
+          dispatchRef.current({
+            type: 'outcome',
+            result: outcome.winner === selfId ? 'win' : 'loss',
+            reason: outcome.reason,
+          })
+          return
+        }
+        if (decodeRematchBegin(raw)) {
+          dispatchRef.current({ type: 'rematch-begin' })
+          return
+        }
+        if (decodeRematchUnavailable(raw)) {
+          dispatchRef.current({ type: 'rematch-unavailable' })
+        }
       })
       match.addEventListener(
         'open',
@@ -137,6 +172,13 @@ export default function App() {
   const handleHudChange = (nextHud: RoundHud) => {
     hudRef.current = nextHud
     setHud(nextHud)
+    if (
+      shellRef.current.roundKind === 'versus' &&
+      !shellRef.current.versusOutcome &&
+      nextHud.phase === 'game-over'
+    ) {
+      matchSocketRef.current?.send(encodeDeath())
+    }
     setHighScore((currentHighScore) => {
       if (shellRef.current.roundKind === 'versus') return currentHighScore
       if (nextHud.score <= currentHighScore) return currentHighScore
@@ -153,7 +195,9 @@ export default function App() {
     hud?.phase === 'paused' &&
     shell.overlay !== 'settings'
   const showGameOver =
-    inRound && hud?.phase === 'game-over' && shell.overlay === 'none'
+    inRound &&
+    shell.overlay === 'none' &&
+    (versusRound ? shell.versusOutcome !== null : hud?.phase === 'game-over')
 
   return (
     <main className="app-shell">
@@ -169,7 +213,9 @@ export default function App() {
                   </h1>
                 )}
               </div>
-              {versusRound && hud?.phase !== 'game-over' ? (
+              {versusRound &&
+              !shell.versusOutcome &&
+              hud?.phase !== 'game-over' ? (
                 <button
                   type="button"
                   onClick={() => dispatch({ type: 'abandon' })}
@@ -310,7 +356,19 @@ export default function App() {
             aria-label="Fim de jogo"
           >
             <p className="eyebrow">FIM DE JOGO</p>
-            {versusRound ? null : (
+            {versusRound && shell.versusOutcome ? (
+              <>
+                <strong>
+                  {shell.versusOutcome.result === 'win'
+                    ? 'Você venceu'
+                    : 'Você perdeu'}
+                </strong>
+                {shell.versusOutcome.result === 'win' &&
+                shell.versusOutcome.reason === 'forfeit' ? (
+                  <span>O oponente saiu</span>
+                ) : null}
+              </>
+            ) : (
               <>
                 <strong>{hud?.score ?? 0}</strong>
                 <span>pontos</span>
@@ -318,19 +376,25 @@ export default function App() {
               </>
             )}
             <div className="menu-actions">
-              {versusRound ? null : (
+              {versusRound && shell.versusOutcome?.rematchAvailable ? (
                 <button
                   type="button"
-                  onClick={() =>
-                    dispatch({
-                      type: 'play-again',
-                      phase: hud?.phase,
-                    })
-                  }
+                  onClick={() => matchSocketRef.current?.send(encodeRematch())}
                 >
-                  Jogar novamente
+                  Revanche
                 </button>
-              )}
+              ) : null}
+              <button
+                type="button"
+                onClick={() =>
+                  dispatch({
+                    type: 'play-again',
+                    phase: hud?.phase,
+                  })
+                }
+              >
+                Jogar novamente
+              </button>
               <button
                 type="button"
                 onClick={() => dispatch({ type: 'abandon' })}

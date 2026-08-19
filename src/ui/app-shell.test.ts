@@ -13,6 +13,7 @@ describe('app-shell navigator', () => {
       overlay: 'none',
       settingsCaller: null,
       roundKind: null,
+      versusOutcome: null,
     })
   })
 
@@ -24,6 +25,7 @@ describe('app-shell navigator', () => {
         overlay: 'none',
         settingsCaller: null,
         roundKind: 'single-player',
+        versusOutcome: null,
       },
       effect: 'start',
     })
@@ -37,6 +39,7 @@ describe('app-shell navigator', () => {
         overlay: 'none',
         settingsCaller: null,
         roundKind: null,
+        versusOutcome: null,
       },
       effect: 'none',
     })
@@ -53,6 +56,7 @@ describe('app-shell navigator', () => {
         overlay: 'none',
         settingsCaller: null,
         roundKind: 'versus',
+        versusOutcome: null,
       },
       effect: 'start',
     })
@@ -95,6 +99,7 @@ describe('app-shell navigator', () => {
       overlay: 'settings',
       settingsCaller: 'main-menu',
       roundKind: null,
+      versusOutcome: null,
     })
 
     expect(reduceShell(opened.state, { type: 'close-overlay' }).state).toEqual(
@@ -116,6 +121,7 @@ describe('app-shell navigator', () => {
       overlay: 'settings',
       settingsCaller: 'pause',
       roundKind: 'single-player',
+      versusOutcome: null,
     })
 
     const closed = reduceShell(opened.state, { type: 'escape' })
@@ -124,6 +130,7 @@ describe('app-shell navigator', () => {
       overlay: 'none',
       settingsCaller: null,
       roundKind: 'single-player',
+      versusOutcome: null,
     })
     expect(closed.effect).toBe('none')
   })
@@ -222,6 +229,91 @@ describe('app-shell navigator', () => {
     expect(
       reduceShell(round, { type: 'play-again', phase: 'game-over' }),
     ).toEqual({ state: round, effect: 'none' })
+  })
+
+  it('records a Versus outcome with Rematch available and stops the Round', () => {
+    const round = startVersusRound()
+    const result = reduceShell(round, {
+      type: 'outcome',
+      result: 'win',
+      reason: 'death-line',
+    })
+
+    expect(result.state.versusOutcome).toEqual({
+      result: 'win',
+      reason: 'death-line',
+      rematchAvailable: true,
+    })
+    expect(result.effect).toBe('stop')
+  })
+
+  it('hides Rematch when the Opponent is gone', () => {
+    const forfeited = reduceShell(startVersusRound(), {
+      type: 'outcome',
+      result: 'win',
+      reason: 'forfeit',
+    })
+    expect(forfeited.state.versusOutcome?.rematchAvailable).toBe(false)
+
+    const ended = reduceShell(startVersusRound(), {
+      type: 'outcome',
+      result: 'win',
+      reason: 'death-line',
+    }).state
+    const result = reduceShell(ended, { type: 'rematch-unavailable' })
+
+    expect(result.state.versusOutcome?.rematchAvailable).toBe(false)
+    expect(result.effect).toBe('none')
+  })
+
+  it('re-enters Matchmaking from Versus Play again after outcome', () => {
+    const ended = reduceShell(startVersusRound(), {
+      type: 'outcome',
+      result: 'loss',
+      reason: 'death-line',
+    }).state
+    const result = reduceShell(ended, {
+      type: 'play-again',
+      phase: 'game-over',
+    })
+
+    expect(result).toEqual({
+      state: {
+        mode: 'matchmaking',
+        overlay: 'none',
+        settingsCaller: null,
+        roundKind: null,
+        versusOutcome: null,
+      },
+      effect: 'none',
+    })
+  })
+
+  it('returns to the Main Menu from Versus game-over', () => {
+    const ended = reduceShell(startVersusRound(), {
+      type: 'outcome',
+      result: 'loss',
+      reason: 'death-line',
+    }).state
+
+    expect(reduceShell(ended, { type: 'abandon' })).toEqual({
+      state: createShellState(),
+      effect: 'none',
+    })
+  })
+
+  it('starts a new Versus Round when Rematch begins', () => {
+    const ended = reduceShell(startVersusRound(), {
+      type: 'outcome',
+      result: 'win',
+      reason: 'death-line',
+    }).state
+    const result = reduceShell(ended, { type: 'rematch-begin' })
+
+    expect(result.state.mode).toBe('round')
+    expect(result.state.roundKind).toBe('versus')
+    expect(result.state.versusOutcome).toBeNull()
+    expect(result.effect).toBe('start')
   })
 
   it('resumes from the pause overlay action', () => {

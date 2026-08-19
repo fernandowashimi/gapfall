@@ -9,6 +9,7 @@ import {
   stackExtraGeneratedLines,
   PLAYFIELD_HEIGHT,
   resumeGame,
+  endGame,
   SHOT_SPEED,
   startGame,
   type Cell,
@@ -245,6 +246,15 @@ describe('game core', () => {
     game = advanceGame(game, 5, () => 0)
 
     expect(game.playingTime).toBe(1)
+  })
+
+  it('ends a playing Round at game-over without a Death Line', () => {
+    const playing = startGame(createGame(() => 0))
+    const ended = endGame(playing)
+
+    expect(ended.phase).toBe('game-over')
+    expect(ended.playingTime).toBe(playing.playingTime)
+    expect(endGame(ended)).toBe(ended)
   })
 
   it('does not advance playing time after game-over', () => {

@@ -4,14 +4,18 @@
 
 **Blocked by:** [Match referee](09-match-referee.md), [Matchmaking shell](12-matchmaking-shell.md), [Two-tab Match](13-two-tab-match.md)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Clients report Death Line to the Match room; they do not show Versus game-over until the room’s outcome arrives. Local Death Line is not assumed to be a loss.
-- [ ] First death report loses; the other player wins even if they hit the Death Line later. On outcome, both Rounds stop even if one client is still playing.
-- [ ] Mid-Round Menu principal or a dropped connection forfeits that player; the remaining player wins. Game-over Menu principal after outcome is not a forfeit.
-- [ ] Versus game-over copy is Portuguese: **Você venceu** / **Você perdeu**, with a forfeit win readable as the opponent leaving. No points, no recorde.
-- [ ] Actions: **Revanche**, **Jogar novamente**, **Menu principal**. Hide **Revanche** when the opponent’s socket is gone (including if they leave while one player is waiting on Rematch).
-- [ ] Both Rematch votes start a new Versus Round on the same Match (preparation again). Jogar novamente leaves the Match and re-enters public Matchmaking. Menu principal returns home.
-- [ ] Abandon during a live Round still closes the Match socket. Esc during Versus play remains a no-op.
-- [ ] Single Player game-over (points, recorde, Jogar novamente, Menu principal) is unchanged.
-- [ ] App-shell tests cover Rematch present/hidden, Play again → Matchmaking, Main Menu after outcome, and Versus Esc still not pausing. Referee tests remain the source of truth for death order, forfeit, and Rematch votes.
+- [x] Clients report Death Line to the Match room; they do not show Versus game-over until the room’s outcome arrives. Local Death Line is not assumed to be a loss.
+- [x] First death report loses; the other player wins even if they hit the Death Line later. On outcome, both Rounds stop even if one client is still playing.
+- [x] Mid-Round Menu principal or a dropped connection forfeits that player; the remaining player wins. Game-over Menu principal after outcome is not a forfeit.
+- [x] Versus game-over copy is Portuguese: **Você venceu** / **Você perdeu**, with a forfeit win readable as the opponent leaving. No points, no recorde.
+- [x] Actions: **Revanche**, **Jogar novamente**, **Menu principal**. Hide **Revanche** when the opponent’s socket is gone (including if they leave while one player is waiting on Rematch).
+- [x] Both Rematch votes start a new Versus Round on the same Match (preparation again). Jogar novamente leaves the Match and re-enters public Matchmaking. Menu principal returns home.
+- [x] Abandon during a live Round still closes the Match socket. Esc during Versus play remains a no-op.
+- [x] Single Player game-over (points, recorde, Jogar novamente, Menu principal) is unchanged.
+- [x] App-shell tests cover Rematch present/hidden, Play again → Matchmaking, Main Menu after outcome, and Versus Esc still not pausing. Referee tests remain the source of truth for death order, forfeit, and Rematch votes.
+
+## Answer
+
+Clients report Death Line; Versus game-over waits for the Match outcome (`Você venceu` / `Você perdeu`, forfeit win as “O oponente saiu”). Outcome stops the local Round via `endGame`. Forfeit and `rematch-unavailable` hide **Revanche**. Both Rematch votes remount the Versus Round; **Jogar novamente** requeues; post-outcome **Menu principal** just leaves. App-shell tests are in `src/ui/app-shell.test.ts`; referee tests stay the death/forfeit/Rematch source of truth.
