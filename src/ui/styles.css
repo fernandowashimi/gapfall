@@ -185,6 +185,56 @@ button {
   color: #dbeafe;
 }
 
+.versus-identity-large {
+  flex-direction: column;
+  max-width: 46%;
+  gap: 10px;
+}
+
+.versus-identity-large img,
+.versus-identity-large .versus-identity-placeholder {
+  width: 64px;
+  height: 64px;
+}
+
+.versus-identity-large span {
+  font-size: 14px;
+  text-align: center;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.versus-preparation {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 28px;
+  padding: 72px 20px 28px;
+  pointer-events: none;
+  background: rgba(8, 13, 28, 0.62);
+  text-shadow: 0 2px 12px #000;
+}
+
+.versus-preparation-matchup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: min(100%, 320px);
+}
+
+.versus-preparation-count {
+  font:
+    900 68px/1 'Orbitron',
+    sans-serif;
+  color: #fff;
+}
+
 .game-overlay {
   position: absolute;
   z-index: 2;

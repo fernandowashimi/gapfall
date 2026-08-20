@@ -9,6 +9,7 @@ import {
 } from '../game/game-core'
 import {
   createRound,
+  hudOf,
   launchRound,
   pauseRound,
   resumeRound,
@@ -22,6 +23,20 @@ describe('Round commands', () => {
     expect(session.game.phase).toBe('preparing')
     expect(session.game.score).toBe(0)
     expect(session.detonations).toEqual([])
+  })
+
+  it('exposes preparation countdown on the Round HUD', () => {
+    const session = createRound(() => 0.3)
+    expect(hudOf(session)).toEqual({
+      phase: 'preparing',
+      score: 0,
+      preparationRemaining: 3,
+    })
+
+    const mid = tickRound(session, 1.1, () => 0.3)
+    expect(mid.hudChanged).toBe(true)
+    expect(hudOf(mid.session).preparationRemaining).toBeCloseTo(1.9, 5)
+    expect(Math.ceil(hudOf(mid.session).preparationRemaining)).toBe(2)
   })
 
   it('creates a Versus Round with Base Fall Speed as the Speed Cap', () => {

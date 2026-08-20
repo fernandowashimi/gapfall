@@ -542,4 +542,15 @@ describe('app-shell Versus identity freeze', () => {
     expect(rematch.frozenPlayer).toEqual(samplePlayer)
     expect(rematch.versusOutcome).toBeNull()
   })
+
+  it('treats Desistir during preparation as a Surrender back to the Main Menu', () => {
+    const round = startVersusRound()
+    expect(round.mode).toBe('round')
+    expect(round.roundKind).toBe('versus')
+    // Shell leave is abandon; Match close (ticket 02) is the Forfeit for the Opponent.
+    expect(reduceShell(round, { type: 'abandon' })).toEqual({
+      state: createShellState(),
+      effect: 'none',
+    })
+  })
 })

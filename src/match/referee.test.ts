@@ -283,5 +283,9 @@ describe('Match referee verified identities', () => {
 
     expect(rematch.state.identities).toEqual(identified.identities)
     expect(rematch.state.phase).toBe('playing')
+    expect(rematch.messages).toEqual([
+      { to: 'a', type: 'rematch-begin' },
+      { to: 'b', type: 'rematch-begin' },
+    ])
   })
 })

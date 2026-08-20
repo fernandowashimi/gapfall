@@ -29,6 +29,7 @@ export interface RoundSession {
 export interface RoundHud {
   phase: GameState['phase']
   score: number
+  preparationRemaining: number
 }
 
 export interface RoundResult {
@@ -61,7 +62,11 @@ export function applySentGeneratedLines(
 }
 
 export function hudOf(session: RoundSession): RoundHud {
-  return { phase: session.game.phase, score: session.game.score }
+  return {
+    phase: session.game.phase,
+    score: session.game.score,
+    preparationRemaining: session.game.preparationRemaining,
+  }
 }
 
 export function applyAudioGate(
@@ -189,7 +194,10 @@ function roundResult(
     sounds,
     audioGate,
     hudChanged:
-      hud.score !== previousHud.score || hud.phase !== previousHud.phase,
+      hud.score !== previousHud.score ||
+      hud.phase !== previousHud.phase ||
+      Math.ceil(hud.preparationRemaining) !==
+        Math.ceil(previousHud.preparationRemaining),
     linesRemoved,
   }
 }

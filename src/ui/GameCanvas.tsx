@@ -38,6 +38,7 @@ interface GameCanvasProps {
   onLinesRemoved?: (n: number) => void
   audio: GameAudio
   pauseWhenHidden?: boolean
+  showPreparationCountdown?: boolean
 }
 
 const keyColumns: Record<string, Column> = { a: 0, s: 1, k: 2, l: 3 }
@@ -48,6 +49,7 @@ export function GameCanvas({
   onLinesRemoved,
   audio,
   pauseWhenHidden = true,
+  showPreparationCountdown = true,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fpsRef = useRef<HTMLDivElement>(null)
@@ -55,6 +57,7 @@ export function GameCanvas({
   const audioRef = useRef(audio)
   const onHudChangeRef = useRef(onHudChange)
   const onLinesRemovedRef = useRef(onLinesRemoved)
+  const showPreparationCountdownRef = useRef(showPreparationCountdown)
 
   useEffect(() => {
     audioRef.current = audio
@@ -67,6 +70,10 @@ export function GameCanvas({
   useEffect(() => {
     onLinesRemovedRef.current = onLinesRemoved
   }, [onLinesRemoved])
+
+  useEffect(() => {
+    showPreparationCountdownRef.current = showPreparationCountdown
+  }, [showPreparationCountdown])
 
   useEffect(() => {
     let cancelled = false
@@ -108,6 +115,7 @@ export function GameCanvas({
           result.session.game,
           spritesRef.current,
           result.session.detonations,
+          showPreparationCountdownRef.current,
         )
       }
       if (import.meta.env.DEV && fpsRef.current) {
@@ -117,7 +125,13 @@ export function GameCanvas({
     }
 
     if (session) {
-      drawGame(context, session.game, spritesRef.current, session.detonations)
+      drawGame(
+        context,
+        session.game,
+        spritesRef.current,
+        session.detonations,
+        showPreparationCountdownRef.current,
+      )
     }
     frameId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(frameId)
@@ -232,6 +246,7 @@ function drawGame(
   game: GameState,
   sprites: GameSprites | null,
   detonations: readonly ActiveDetonation[],
+  showPreparationCountdown: boolean,
 ) {
   context.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT)
 
@@ -265,8 +280,9 @@ function drawGame(
     )
   drawDetonations(context, detonations, sprites)
   drawLauncher(context, sprites)
-  if (game.phase === 'preparing')
+  if (showPreparationCountdown && game.phase === 'preparing') {
     drawPreparation(context, game.preparationRemaining)
+  }
 }
 
 function drawDetonations(

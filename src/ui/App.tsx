@@ -236,6 +236,8 @@ export default function App() {
 
   const inRound = shell.mode === 'round'
   const versusRound = inRound && shell.roundKind === 'versus'
+  const versusPreparing =
+    versusRound && hud?.phase === 'preparing' && !shell.versusOutcome
   const showPause =
     inRound &&
     !versusRound &&
@@ -253,13 +255,7 @@ export default function App() {
           <>
             <header className="game-hud">
               {versusRound ? (
-                <div className="versus-identities" aria-label="Versus">
-                  <VersusIdentitySide side={matchIdentities?.[0] ?? null} />
-                  <span className="versus-identities-vs" aria-hidden="true">
-                    vs
-                  </span>
-                  <VersusIdentitySide side={matchIdentities?.[1] ?? null} />
-                </div>
+                <VersusMatchup sides={matchIdentities} />
               ) : (
                 <div>
                   <p className="eyebrow">Gapfall</p>
@@ -289,7 +285,21 @@ export default function App() {
                   : undefined
               }
               pauseWhenHidden={!versusRound}
+              showPreparationCountdown={!versusRound}
             />
+            {versusPreparing ? (
+              <div
+                className="versus-preparation"
+                role="status"
+                aria-live="polite"
+                aria-label="Preparação"
+              >
+                <VersusMatchup sides={matchIdentities} size="large" />
+                <strong className="versus-preparation-count">
+                  {Math.ceil(hud.preparationRemaining)}
+                </strong>
+              </div>
+            ) : null}
           </>
         ) : null}
 
@@ -552,16 +562,49 @@ function applyRoundCommand(
   setHud(hudOf(result.session))
 }
 
+function VersusMatchup({
+  sides,
+  size = 'compact',
+}: {
+  sides: readonly [MatchSideIdentity, MatchSideIdentity] | null
+  size?: 'compact' | 'large'
+}) {
+  return (
+    <div
+      className={
+        size === 'large'
+          ? 'versus-identities versus-preparation-matchup'
+          : 'versus-identities'
+      }
+      aria-label="Versus"
+    >
+      <VersusIdentitySide side={sides?.[0] ?? null} size={size} />
+      <span className="versus-identities-vs" aria-hidden="true">
+        vs
+      </span>
+      <VersusIdentitySide side={sides?.[1] ?? null} size={size} />
+    </div>
+  )
+}
+
 function VersusIdentitySide({
   side,
+  size = 'compact',
 }: {
   side: MatchSideIdentity | null
+  size?: 'compact' | 'large'
 }) {
   const anonymous = !side || side.name === null || side.picture === null
   const label = anonymous ? 'Oponente' : side.name
 
   return (
-    <div className="versus-identity">
+    <div
+      className={
+        size === 'large'
+          ? 'versus-identity versus-identity-large'
+          : 'versus-identity'
+      }
+    >
       {anonymous ? (
         <span className="versus-identity-placeholder" aria-hidden="true" />
       ) : (
