@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createShellState, reduceShell, type ShellState } from './app-shell'
+import type { PlayerProfile } from './player-session'
+
+const samplePlayer: PlayerProfile = {
+  name: 'Ana Silva',
+  picture: 'https://example.com/avatar.jpg',
+  idToken: 'token',
+}
 
 function startVersusRound(): ShellState {
   const matchmaking = reduceShell(createShellState(), { type: 'versus' }).state
@@ -14,6 +21,7 @@ describe('app-shell navigator', () => {
       settingsCaller: null,
       roundKind: null,
       versusOutcome: null,
+      player: null,
     })
   })
 
@@ -26,6 +34,7 @@ describe('app-shell navigator', () => {
         settingsCaller: null,
         roundKind: 'single-player',
         versusOutcome: null,
+        player: null,
       },
       effect: 'start',
     })
@@ -40,6 +49,7 @@ describe('app-shell navigator', () => {
         settingsCaller: null,
         roundKind: null,
         versusOutcome: null,
+        player: null,
       },
       effect: 'none',
     })
@@ -57,6 +67,7 @@ describe('app-shell navigator', () => {
         settingsCaller: null,
         roundKind: 'versus',
         versusOutcome: null,
+        player: null,
       },
       effect: 'start',
     })
@@ -100,6 +111,7 @@ describe('app-shell navigator', () => {
       settingsCaller: 'main-menu',
       roundKind: null,
       versusOutcome: null,
+      player: null,
     })
 
     expect(reduceShell(opened.state, { type: 'close-overlay' }).state).toEqual(
@@ -122,6 +134,7 @@ describe('app-shell navigator', () => {
       settingsCaller: 'pause',
       roundKind: 'single-player',
       versusOutcome: null,
+      player: null,
     })
 
     const closed = reduceShell(opened.state, { type: 'escape' })
@@ -131,6 +144,7 @@ describe('app-shell navigator', () => {
       settingsCaller: null,
       roundKind: 'single-player',
       versusOutcome: null,
+      player: null,
     })
     expect(closed.effect).toBe('none')
   })
@@ -284,6 +298,7 @@ describe('app-shell navigator', () => {
         settingsCaller: null,
         roundKind: null,
         versusOutcome: null,
+        player: null,
       },
       effect: 'none',
     })
@@ -321,6 +336,120 @@ describe('app-shell navigator', () => {
     expect(reduceShell(round, { type: 'resume' })).toEqual({
       state: round,
       effect: 'resume',
+    })
+  })
+})
+
+describe('app-shell Player session', () => {
+  it('signs in on the Main Menu with Entrar', () => {
+    const result = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    })
+    expect(result).toEqual({
+      state: { ...createShellState(), player: samplePlayer },
+      effect: 'none',
+    })
+  })
+
+  it('opens sign-out confirm when tapping the signed-in Player', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const result = reduceShell(signedIn, { type: 'open-sign-out' })
+    expect(result.state.overlay).toBe('sign-out-confirm')
+    expect(result.state.player).toEqual(samplePlayer)
+    expect(result.effect).toBe('none')
+  })
+
+  it('keeps the Player when sign-out is cancelled', () => {
+    const confirming = reduceShell(
+      reduceShell(createShellState(), {
+        type: 'sign-in',
+        profile: samplePlayer,
+      }).state,
+      { type: 'open-sign-out' },
+    ).state
+    expect(reduceShell(confirming, { type: 'cancel-sign-out' })).toEqual({
+      state: { ...createShellState(), player: samplePlayer },
+      effect: 'none',
+    })
+    expect(
+      reduceShell(confirming, { type: 'escape' }).state.player,
+    ).toEqual(samplePlayer)
+  })
+
+  it('returns Entrar after sign-out is confirmed', () => {
+    const confirming = reduceShell(
+      reduceShell(createShellState(), {
+        type: 'sign-in',
+        profile: samplePlayer,
+      }).state,
+      { type: 'open-sign-out' },
+    ).state
+    expect(reduceShell(confirming, { type: 'confirm-sign-out' })).toEqual({
+      state: createShellState(),
+      effect: 'none',
+    })
+  })
+
+  it('restores a persisted Player on the Main Menu', () => {
+    expect(createShellState(samplePlayer)).toEqual({
+      mode: 'main-menu',
+      overlay: 'none',
+      settingsCaller: null,
+      roundKind: null,
+      versusOutcome: null,
+      player: samplePlayer,
+    })
+  })
+
+  it('does not sign in outside the Main Menu', () => {
+    const matchmaking = reduceShell(createShellState(), { type: 'versus' }).state
+    expect(
+      reduceShell(matchmaking, { type: 'sign-in', profile: samplePlayer }),
+    ).toEqual({ state: matchmaking, effect: 'none' })
+  })
+
+  it('does not offer sign-out outside the Main Menu', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const round = reduceShell(signedIn, { type: 'play' }).state
+    expect(reduceShell(round, { type: 'open-sign-out' })).toEqual({
+      state: round,
+      effect: 'none',
+    })
+  })
+
+  it('starts play actions without a Player', () => {
+    expect(reduceShell(createShellState(), { type: 'play' }).effect).toBe(
+      'start',
+    )
+    expect(reduceShell(createShellState(), { type: 'versus' }).state.mode).toBe(
+      'matchmaking',
+    )
+  })
+
+  it('preserves the Player when leaving Matchmaking or a Round', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const matchmaking = reduceShell(signedIn, { type: 'versus' }).state
+    expect(matchmaking.player).toEqual(samplePlayer)
+
+    expect(reduceShell(matchmaking, { type: 'cancel' }).state).toEqual({
+      ...createShellState(),
+      player: samplePlayer,
+    })
+
+    const round = reduceShell(signedIn, { type: 'play' }).state
+    expect(reduceShell(round, { type: 'abandon' }).state).toEqual({
+      ...createShellState(),
+      player: samplePlayer,
     })
   })
 })

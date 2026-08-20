@@ -5,6 +5,13 @@ import {
   type ShellIntent,
   type ShellState,
 } from './app-shell'
+import { requestGoogleCredential } from './google-sign-in'
+import {
+  clearPlayerSession,
+  profileFromIdToken,
+  readPlayerSession,
+  writePlayerSession,
+} from './player-session'
 import { createGameAudio } from './audio'
 import {
   readAudioSettings,
@@ -41,7 +48,9 @@ import type { PartySocket } from 'partysocket'
 const REPO_URL = 'https://github.com/fernandowashimi/gapfall'
 
 export default function App() {
-  const [shell, setShell] = useState<ShellState>(createShellState)
+  const [shell, setShell] = useState<ShellState>(() =>
+    createShellState(readPlayerSession()),
+  )
   const shellRef = useRef(shell)
   useEffect(() => {
     shellRef.current = shell
@@ -65,9 +74,16 @@ export default function App() {
   }, [audio, audioSettings])
 
   const dispatch = (intent: ShellIntent) => {
+    const previousPlayer = shellRef.current.player
     const result = reduceShell(shellRef.current, intent)
     shellRef.current = result.state
     setShell(result.state)
+
+    if (result.state.player && result.state.player !== previousPlayer) {
+      writePlayerSession(result.state.player)
+    } else if (previousPlayer && !result.state.player) {
+      clearPlayerSession()
+    }
 
     if (result.effect === 'start' || result.effect === 'remount') {
       audio.unsilence()
@@ -187,6 +203,22 @@ export default function App() {
     })
   }
 
+  const handleEntrar = async () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+    if (!clientId) {
+      console.warn('VITE_GOOGLE_CLIENT_ID is not configured')
+      return
+    }
+    try {
+      const credential = await requestGoogleCredential(clientId)
+      const profile = profileFromIdToken(credential)
+      if (!profile) return
+      dispatch({ type: 'sign-in', profile })
+    } catch (error) {
+      console.warn('Google sign-in failed', error)
+    }
+  }
+
   const inRound = shell.mode === 'round'
   const versusRound = inRound && shell.roundKind === 'versus'
   const showPause =
@@ -251,7 +283,23 @@ export default function App() {
               width={1370}
               height={359}
             />
-            <span>recorde: {highScore}</span>
+            <div className="menu-recorde-slot">
+              <span>recorde: {highScore}</span>
+              {shell.player ? (
+                <button
+                  type="button"
+                  className="menu-player"
+                  onClick={() => dispatch({ type: 'open-sign-out' })}
+                >
+                  <img src={shell.player.picture} alt="" />
+                  <span>{shell.player.name}</span>
+                </button>
+              ) : (
+                <button type="button" onClick={() => void handleEntrar()}>
+                  Entrar
+                </button>
+              )}
+            </div>
             <div className="menu-actions">
               <button type="button" onClick={() => dispatch({ type: 'play' })}>
                 Um jogador
@@ -337,6 +385,32 @@ export default function App() {
             >
               Voltar
             </button>
+          </div>
+        ) : null}
+
+        {shell.overlay === 'sign-out-confirm' ? (
+          <div
+            className="game-overlay menu-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Sair da conta"
+          >
+            <p className="eyebrow">SAIR</p>
+            <span>Sair da conta Google?</span>
+            <div className="menu-actions">
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'confirm-sign-out' })}
+              >
+                Sair
+              </button>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'cancel-sign-out' })}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         ) : null}
 

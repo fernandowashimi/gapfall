@@ -1,10 +1,15 @@
 import type { GamePhase } from '../game/game-core'
+import type { PlayerProfile } from './player-session'
 
 export type ShellMode = 'main-menu' | 'round' | 'matchmaking'
 
 export type RoundKind = 'single-player' | 'versus'
 
-export type ShellOverlay = 'none' | 'instructions' | 'settings'
+export type ShellOverlay =
+  | 'none'
+  | 'instructions'
+  | 'settings'
+  | 'sign-out-confirm'
 
 export type SettingsCaller = 'main-menu' | 'pause'
 
@@ -14,6 +19,7 @@ export interface ShellState {
   settingsCaller: SettingsCaller | null
   roundKind: RoundKind | null
   versusOutcome: VersusOutcome | null
+  player: PlayerProfile | null
 }
 
 export type VersusOutcome = {
@@ -41,6 +47,10 @@ export type ShellIntent =
     }
   | { type: 'rematch-unavailable' }
   | { type: 'rematch-begin' }
+  | { type: 'sign-in'; profile: PlayerProfile }
+  | { type: 'open-sign-out' }
+  | { type: 'confirm-sign-out' }
+  | { type: 'cancel-sign-out' }
 
 export type RoundEffect =
   'none' | 'start' | 'remount' | 'pause' | 'resume' | 'stop'
@@ -50,13 +60,14 @@ export interface ShellResult {
   effect: RoundEffect
 }
 
-export function createShellState(): ShellState {
+export function createShellState(player: PlayerProfile | null = null): ShellState {
   return {
     mode: 'main-menu',
     overlay: 'none',
     settingsCaller: null,
     roundKind: null,
     versusOutcome: null,
+    player,
   }
 }
 
@@ -73,7 +84,7 @@ export function reduceShell(
         return noop(state)
       }
       return {
-        state: { ...createShellState(), mode: 'matchmaking' },
+        state: { ...createShellState(state.player), mode: 'matchmaking' },
         effect: 'none',
       }
 
@@ -96,7 +107,7 @@ export function reduceShell(
       if (state.roundKind === 'versus') {
         if (!state.versusOutcome) return noop(state)
         return {
-          state: { ...createShellState(), mode: 'matchmaking' },
+          state: { ...createShellState(state.player), mode: 'matchmaking' },
           effect: 'none',
         }
       }
@@ -140,7 +151,43 @@ export function reduceShell(
     case 'close-overlay':
       return closeOverlay(state)
 
+    case 'sign-in':
+      if (state.mode !== 'main-menu' || state.overlay !== 'none') {
+        return noop(state)
+      }
+      return {
+        state: { ...state, player: intent.profile },
+        effect: 'none',
+      }
+
+    case 'open-sign-out':
+      if (
+        state.mode !== 'main-menu' ||
+        state.overlay !== 'none' ||
+        !state.player
+      ) {
+        return noop(state)
+      }
+      return {
+        state: { ...state, overlay: 'sign-out-confirm', settingsCaller: null },
+        effect: 'none',
+      }
+
+    case 'confirm-sign-out':
+      if (state.overlay !== 'sign-out-confirm') return noop(state)
+      return {
+        state: { ...state, overlay: 'none', player: null },
+        effect: 'none',
+      }
+
+    case 'cancel-sign-out':
+      if (state.overlay !== 'sign-out-confirm') return noop(state)
+      return closeOverlay(state)
+
     case 'escape':
+      if (state.overlay === 'sign-out-confirm') {
+        return closeOverlay(state)
+      }
       if (state.overlay === 'settings' || state.overlay === 'instructions') {
         return closeOverlay(state)
       }
@@ -163,7 +210,7 @@ export function reduceShell(
 
     case 'abandon':
       if (state.mode !== 'round') return noop(state)
-      return { state: createShellState(), effect: 'none' }
+      return { state: createShellState(state.player), effect: 'none' }
 
     case 'outcome':
       if (
@@ -211,7 +258,7 @@ export function reduceShell(
 
 function leaveMatchmaking(state: ShellState): ShellResult {
   if (state.mode !== 'matchmaking') return noop(state)
-  return { state: createShellState(), effect: 'none' }
+  return { state: createShellState(state.player), effect: 'none' }
 }
 
 function startSinglePlayerFromMenu(state: ShellState): ShellResult {
@@ -231,8 +278,12 @@ function startSinglePlayerFromMenu(state: ShellState): ShellResult {
 function closeOverlay(state: ShellState): ShellResult {
   if (state.overlay === 'none') return noop(state)
 
+  if (state.overlay === 'sign-out-confirm') {
+    return { state: { ...state, overlay: 'none' }, effect: 'none' }
+  }
+
   if (state.overlay === 'instructions') {
-    return { state: createShellState(), effect: 'none' }
+    return { state: createShellState(state.player), effect: 'none' }
   }
 
   if (state.settingsCaller === 'pause') {
@@ -242,7 +293,7 @@ function closeOverlay(state: ShellState): ShellResult {
     }
   }
 
-  return { state: createShellState(), effect: 'none' }
+  return { state: createShellState(state.player), effect: 'none' }
 }
 
 function clearOverlay(state: ShellState): ShellState {
