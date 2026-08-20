@@ -1,4 +1,11 @@
+import type { MatchSideIdentity } from './messages'
+
 export type PlayerId = string
+
+export type VerifiedIdentity = {
+  name: string
+  picture: string
+}
 
 export type QueueState = {
   waiters: readonly PlayerId[]
@@ -21,6 +28,7 @@ export type MatchState = {
   outcome: MatchOutcome | null
   rematchVotes: readonly PlayerId[]
   rematchAvailable: boolean
+  identities: Readonly<Record<PlayerId, VerifiedIdentity | null | undefined>>
 }
 
 export type QueueEvent =
@@ -31,6 +39,11 @@ export type MatchEvent =
   | { type: 'death'; from: PlayerId }
   | { type: 'close'; from: PlayerId }
   | { type: 'rematch'; from: PlayerId }
+  | {
+      type: 'identity'
+      from: PlayerId
+      claims: VerifiedIdentity | null
+    }
 
 export type RefereeMessage =
   | { to: PlayerId; type: 'paired'; matchId: string }
@@ -44,6 +57,11 @@ export type RefereeMessage =
     }
   | { to: PlayerId; type: 'rematch-begin' }
   | { to: PlayerId; type: 'rematch-unavailable' }
+  | {
+      to: PlayerId
+      type: 'identities'
+      players: readonly [MatchSideIdentity, MatchSideIdentity]
+    }
 
 export type QueueResult = {
   state: QueueState
@@ -72,6 +90,7 @@ export function createMatchState(
     outcome: null,
     rematchVotes: [],
     rematchAvailable: true,
+    identities: { [playerA]: undefined, [playerB]: undefined },
   }
 }
 
@@ -115,6 +134,8 @@ export function reduceMatch(state: MatchState, event: MatchEvent): MatchResult {
       return closePlayer(state, event.from)
     case 'rematch':
       return voteRematch(state, event.from)
+    case 'identity':
+      return recordIdentity(state, event.from, event.claims)
     default:
       return { state, messages: [] }
   }
@@ -215,4 +236,43 @@ function voteRematch(state: MatchState, playerId: PlayerId): MatchResult {
       type: 'rematch-begin' as const,
     })),
   }
+}
+
+function recordIdentity(
+  state: MatchState,
+  from: PlayerId,
+  claims: VerifiedIdentity | null,
+): MatchResult {
+  if (!state.players.includes(from)) return { state, messages: [] }
+  if (state.identities[from] !== undefined) return { state, messages: [] }
+
+  const identities = { ...state.identities, [from]: claims }
+  const next = { ...state, identities }
+  const [a, b] = state.players
+  if (identities[a] === undefined || identities[b] === undefined) {
+    return { state: next, messages: [] }
+  }
+
+  const players = [
+    sideBroadcast(a, identities[a]),
+    sideBroadcast(b, identities[b]),
+  ] as const
+
+  return {
+    state: next,
+    messages: state.players.map((to) => ({
+      to,
+      type: 'identities' as const,
+      players,
+    })),
+  }
+}
+
+function sideBroadcast(
+  id: PlayerId,
+  claims: VerifiedIdentity | null,
+): MatchSideIdentity {
+  return claims
+    ? { id, name: claims.name, picture: claims.picture }
+    : { id, name: null, picture: null }
 }

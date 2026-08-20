@@ -31,6 +31,22 @@ export type RematchUnavailableMessage = {
   type: 'rematch-unavailable'
 }
 
+export type IdentityMessage = {
+  type: 'identity'
+  idToken: string | null
+}
+
+export type MatchSideIdentity = {
+  id: string
+  name: string | null
+  picture: string | null
+}
+
+export type IdentitiesMessage = {
+  type: 'identities'
+  players: readonly [MatchSideIdentity, MatchSideIdentity]
+}
+
 export function encodePaired(matchId: string): string {
   return JSON.stringify({ type: 'paired', matchId })
 }
@@ -147,6 +163,73 @@ export function decodeRematchUnavailable(
   raw: string,
 ): RematchUnavailableMessage | null {
   return decodeTyped(raw, 'rematch-unavailable')
+}
+
+export function encodeIdentity(idToken: string | null): string {
+  return JSON.stringify({ type: 'identity', idToken })
+}
+
+export function decodeIdentity(raw: string): IdentityMessage | null {
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'type' in value &&
+      value.type === 'identity' &&
+      'idToken' in value &&
+      (typeof value.idToken === 'string' || value.idToken === null)
+    ) {
+      return { type: 'identity', idToken: value.idToken }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+export function encodeIdentities(
+  players: readonly [MatchSideIdentity, MatchSideIdentity],
+): string {
+  return JSON.stringify({ type: 'identities', players })
+}
+
+export function decodeIdentities(raw: string): IdentitiesMessage | null {
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'type' in value &&
+      value.type === 'identities' &&
+      'players' in value &&
+      Array.isArray(value.players) &&
+      value.players.length === 2 &&
+      isMatchSideIdentity(value.players[0]) &&
+      isMatchSideIdentity(value.players[1])
+    ) {
+      return {
+        type: 'identities',
+        players: [value.players[0], value.players[1]],
+      }
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
+function isMatchSideIdentity(value: unknown): value is MatchSideIdentity {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'name' in value &&
+    (typeof value.name === 'string' || value.name === null) &&
+    'picture' in value &&
+    (typeof value.picture === 'string' || value.picture === null)
+  )
 }
 
 function decodeTyped<T extends string>(

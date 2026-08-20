@@ -1,8 +1,10 @@
 import { Server, type Connection, type WSMessage } from 'partyserver'
 import {
   decodeDeath,
+  decodeIdentity,
   decodeLinesRemoved,
   decodeRematch,
+  encodeIdentities,
   encodeLinesRemoved,
   encodeOutcome,
   encodeRematchBegin,
@@ -14,12 +16,19 @@ import {
   type MatchEvent,
   type MatchState,
   type RefereeMessage,
+  type VerifiedIdentity,
 } from '../src/match/referee'
+import { verifyGoogleIdToken } from './verify-google-id-token'
 
-export class Match extends Server {
+type MatchEnv = {
+  GOOGLE_CLIENT_ID?: string
+}
+
+export class Match extends Server<MatchEnv> {
   static options = { hibernate: false }
 
   #match: MatchState | null = null
+  #pendingIdentity = new Map<string, VerifiedIdentity | null>()
 
   async onStart() {
     this.#match = (await this.ctx.storage.get<MatchState>('match')) ?? null
@@ -34,17 +43,43 @@ export class Match extends Server {
     if (ids.length === 2) {
       this.#match ??= createMatchState(this.name, ids[0], ids[1])
       await this.ctx.storage.put('match', this.#match)
+      for (const playerId of ids) {
+        if (!this.#pendingIdentity.has(playerId)) continue
+        const claims = this.#pendingIdentity.get(playerId) ?? null
+        this.#pendingIdentity.delete(playerId)
+        await this.apply({ type: 'identity', from: playerId, claims })
+      }
     }
   }
 
   async onMessage(connection: Connection, message: WSMessage) {
-    if (typeof message !== 'string' || !this.#match) return
+    if (typeof message !== 'string') return
+    const identity = decodeIdentity(message)
+    if (identity) {
+      await this.acceptIdentity(connection.id, identity.idToken)
+      return
+    }
+    if (!this.#match) return
     const event = clientEvent(connection.id, message)
     if (event) await this.apply(event)
   }
 
   async onClose(connection: Connection) {
+    this.#pendingIdentity.delete(connection.id)
     await this.apply({ type: 'close', from: connection.id })
+  }
+
+  private async acceptIdentity(from: string, idToken: string | null) {
+    const audience = this.env.GOOGLE_CLIENT_ID ?? ''
+    const claims =
+      idToken === null
+        ? null
+        : await verifyGoogleIdToken(idToken, audience)
+    if (!this.#match) {
+      this.#pendingIdentity.set(from, claims)
+      return
+    }
+    await this.apply({ type: 'identity', from, claims })
   }
 
   private async apply(event: MatchEvent) {
@@ -79,6 +114,8 @@ function encodeRefereeMessage(message: RefereeMessage): string | null {
       return encodeRematchBegin()
     case 'rematch-unavailable':
       return encodeRematchUnavailable()
+    case 'identities':
+      return encodeIdentities(message.players)
     case 'paired':
       return null
   }

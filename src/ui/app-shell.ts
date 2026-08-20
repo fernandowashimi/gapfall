@@ -20,6 +20,7 @@ export interface ShellState {
   roundKind: RoundKind | null
   versusOutcome: VersusOutcome | null
   player: PlayerProfile | null
+  frozenPlayer: PlayerProfile | null
 }
 
 export type VersusOutcome = {
@@ -68,6 +69,7 @@ export function createShellState(player: PlayerProfile | null = null): ShellStat
     roundKind: null,
     versusOutcome: null,
     player,
+    frozenPlayer: null,
   }
 }
 
@@ -84,7 +86,11 @@ export function reduceShell(
         return noop(state)
       }
       return {
-        state: { ...createShellState(state.player), mode: 'matchmaking' },
+        state: {
+          ...createShellState(state.player),
+          mode: 'matchmaking',
+          frozenPlayer: state.player,
+        },
         effect: 'none',
       }
 
@@ -107,7 +113,11 @@ export function reduceShell(
       if (state.roundKind === 'versus') {
         if (!state.versusOutcome) return noop(state)
         return {
-          state: { ...createShellState(state.player), mode: 'matchmaking' },
+          state: {
+            ...createShellState(state.player),
+            mode: 'matchmaking',
+            frozenPlayer: state.frozenPlayer,
+          },
           effect: 'none',
         }
       }

@@ -22,6 +22,7 @@ describe('app-shell navigator', () => {
       roundKind: null,
       versusOutcome: null,
       player: null,
+    frozenPlayer: null,
     })
   })
 
@@ -35,6 +36,7 @@ describe('app-shell navigator', () => {
         roundKind: 'single-player',
         versusOutcome: null,
         player: null,
+      frozenPlayer: null,
       },
       effect: 'start',
     })
@@ -50,6 +52,7 @@ describe('app-shell navigator', () => {
         roundKind: null,
         versusOutcome: null,
         player: null,
+      frozenPlayer: null,
       },
       effect: 'none',
     })
@@ -68,6 +71,7 @@ describe('app-shell navigator', () => {
         roundKind: 'versus',
         versusOutcome: null,
         player: null,
+      frozenPlayer: null,
       },
       effect: 'start',
     })
@@ -112,6 +116,7 @@ describe('app-shell navigator', () => {
       roundKind: null,
       versusOutcome: null,
       player: null,
+    frozenPlayer: null,
     })
 
     expect(reduceShell(opened.state, { type: 'close-overlay' }).state).toEqual(
@@ -135,6 +140,7 @@ describe('app-shell navigator', () => {
       roundKind: 'single-player',
       versusOutcome: null,
       player: null,
+    frozenPlayer: null,
     })
 
     const closed = reduceShell(opened.state, { type: 'escape' })
@@ -145,6 +151,7 @@ describe('app-shell navigator', () => {
       roundKind: 'single-player',
       versusOutcome: null,
       player: null,
+    frozenPlayer: null,
     })
     expect(closed.effect).toBe('none')
   })
@@ -299,6 +306,7 @@ describe('app-shell navigator', () => {
         roundKind: null,
         versusOutcome: null,
         player: null,
+      frozenPlayer: null,
       },
       effect: 'none',
     })
@@ -402,6 +410,7 @@ describe('app-shell Player session', () => {
       roundKind: null,
       versusOutcome: null,
       player: samplePlayer,
+    frozenPlayer: null,
     })
   })
 
@@ -444,12 +453,93 @@ describe('app-shell Player session', () => {
     expect(reduceShell(matchmaking, { type: 'cancel' }).state).toEqual({
       ...createShellState(),
       player: samplePlayer,
+      frozenPlayer: null,
     })
 
     const round = reduceShell(signedIn, { type: 'play' }).state
     expect(reduceShell(round, { type: 'abandon' }).state).toEqual({
       ...createShellState(),
       player: samplePlayer,
+      frozenPlayer: null,
     })
+  })
+})
+
+describe('app-shell Versus identity freeze', () => {
+  it('freezes the Player when entering Versus Matchmaking', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const result = reduceShell(signedIn, { type: 'versus' })
+
+    expect(result.state.mode).toBe('matchmaking')
+    expect(result.state.frozenPlayer).toEqual(samplePlayer)
+    expect(result.state.player).toEqual(samplePlayer)
+  })
+
+  it('freezes anonymous identity when entering Versus without a Player', () => {
+    const result = reduceShell(createShellState(), { type: 'versus' })
+    expect(result.state.frozenPlayer).toBeNull()
+  })
+
+  it('keeps the freeze through Play again into Matchmaking', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const round = reduceShell(
+      reduceShell(signedIn, { type: 'versus' }).state,
+      { type: 'paired' },
+    ).state
+    const ended = reduceShell(round, {
+      type: 'outcome',
+      result: 'win',
+      reason: 'death-line',
+    }).state
+    const again = reduceShell(ended, {
+      type: 'play-again',
+      phase: 'game-over',
+    }).state
+
+    expect(again.mode).toBe('matchmaking')
+    expect(again.frozenPlayer).toEqual(samplePlayer)
+  })
+
+  it('clears the freeze when Desistir abandons to the Main Menu', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const round = reduceShell(
+      reduceShell(signedIn, { type: 'versus' }).state,
+      { type: 'paired' },
+    ).state
+
+    expect(round.frozenPlayer).toEqual(samplePlayer)
+    expect(reduceShell(round, { type: 'abandon' })).toEqual({
+      state: { ...createShellState(), player: samplePlayer },
+      effect: 'none',
+    })
+  })
+
+  it('keeps the freeze across Rematch begin', () => {
+    const signedIn = reduceShell(createShellState(), {
+      type: 'sign-in',
+      profile: samplePlayer,
+    }).state
+    const round = reduceShell(
+      reduceShell(signedIn, { type: 'versus' }).state,
+      { type: 'paired' },
+    ).state
+    const ended = reduceShell(round, {
+      type: 'outcome',
+      result: 'win',
+      reason: 'death-line',
+    }).state
+    const rematch = reduceShell(ended, { type: 'rematch-begin' }).state
+
+    expect(rematch.frozenPlayer).toEqual(samplePlayer)
+    expect(rematch.versusOutcome).toBeNull()
   })
 })

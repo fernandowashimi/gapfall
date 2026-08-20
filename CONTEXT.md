@@ -57,7 +57,7 @@ Elapsed duration of the playing phase in a Round. Preparation and pause do not a
 _Avoid_: wall clock, session time, survival time
 
 **Round**:
-One attempt from choosing Single Player or Versus until the Death Line (or a Versus forfeit) ends it, or the player returns to the Main Menu.
+One attempt from choosing Single Player or Versus until the Death Line (or a Versus Forfeit) ends it, or return to the Main Menu.
 _Avoid_: game, run, session, life
 
 **Death Line**:
@@ -65,7 +65,7 @@ The lower bound of the playfield.
 _Avoid_: bottom edge, floor, fail line
 
 **Main Menu**:
-The app’s home screen outside an active Round. The app opens here; it shows the title, local high score, Single Player / Versus / Settings / Instructions, and project credit.
+The app’s home screen outside an active Round. The app opens here; it shows the title, local high score, Single Player / Versus / Settings / Instructions, project credit, and Entrar or the signed-in Player.
 _Avoid_: title screen, lobby, home
 
 **Single Player**:
@@ -77,19 +77,31 @@ The 1v1 real-time competitive mode started from the Main Menu via Matchmaking. A
 _Avoid_: multiplayer, duel, PvP, online (as the mode name)
 
 **Opponent**:
-The other player in a Versus Match.
+The other participant in a Versus Match. May or may not be a Player.
 _Avoid_: enemy, rival, the other person
 
+**Player**:
+A person signed in with Google in this browser. Optional: Versus and Matchmaking do not require one. Name and image come from Google.
+_Avoid_: user, account, login, profile (as the person)
+
 **Matchmaking**:
-The public random queue that pairs two players into a Versus Match.
+The public random queue that pairs two participants into a Versus Match. Does not require a Player.
 _Avoid_: lobby, search, matchmaking service (as the product concept)
 
 **Match**:
-A Versus pairing of two players, from Matchmaking success until a win, loss, or forfeit.
+A Versus pairing of two participants, from Matchmaking success until a win, loss, or Forfeit.
 _Avoid_: game, lobby, session (as a synonym for this pairing)
 
+**Forfeit**:
+A Versus Match outcome: that participant loses because they left a live Match — Surrender, closed tab, or dropped connection — and the Opponent wins.
+_Avoid_: disconnect (as the outcome name), rage-quit
+
+**Surrender**:
+The Versus control that leaves a live Match, including preparation, and is a Forfeit.
+_Avoid_: quit, pause, abandon (as the control name)
+
 **Settings**:
-Player-controlled sound mute and volume only — not Fall Speed or other round rules. Reachable from the Main Menu and from pause. Mute and volume persist across visits.
+Sound mute and volume only — not Fall Speed or other round rules. Reachable from the Main Menu and from pause. Mute and volume persist across visits.
 _Avoid_: options, preferences, difficulty menu
 
 **Instructions**:

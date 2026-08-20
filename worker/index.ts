@@ -8,6 +8,7 @@ export { Queue } from './queue'
 export type Env = {
   Match: DurableObjectNamespace<Match>
   Queue: DurableObjectNamespace<Queue>
+  GOOGLE_CLIENT_ID?: string
 }
 
 export default {

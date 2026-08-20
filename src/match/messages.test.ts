@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   decodeDeath,
+  decodeIdentities,
+  decodeIdentity,
   decodeLinesRemoved,
   decodeOutcome,
   decodePaired,
@@ -8,6 +10,8 @@ import {
   decodeRematchBegin,
   decodeRematchUnavailable,
   encodeDeath,
+  encodeIdentities,
+  encodeIdentity,
   encodeLinesRemoved,
   encodeOutcome,
   encodePaired,
@@ -91,5 +95,55 @@ describe('Match message codec', () => {
     expect(decodeOutcome('{"type":"outcome"}')).toBeNull()
     expect(decodeOutcome('{"type":"death"}')).toBeNull()
     expect(decodeDeath('{"type":"rematch"}')).toBeNull()
+  })
+
+  it('encodes and decodes a client identity token claim', () => {
+    expect(encodeIdentity('tok')).toBe('{"type":"identity","idToken":"tok"}')
+    expect(decodeIdentity(encodeIdentity('tok'))).toEqual({
+      type: 'identity',
+      idToken: 'tok',
+    })
+    expect(encodeIdentity(null)).toBe('{"type":"identity","idToken":null}')
+    expect(decodeIdentity(encodeIdentity(null))).toEqual({
+      type: 'identity',
+      idToken: null,
+    })
+  })
+
+  it('ignores messages that are not an identity claim', () => {
+    expect(decodeIdentity('not-json')).toBeNull()
+    expect(decodeIdentity('{"type":"identity"}')).toBeNull()
+    expect(decodeIdentity('{"type":"identity","idToken":1}')).toBeNull()
+    expect(decodeIdentity('{"type":"death"}')).toBeNull()
+  })
+
+  it('encodes and decodes verified Match identities', () => {
+    const sides = [
+      { id: 'a', name: 'Ana', picture: 'https://example.com/a.jpg' },
+      { id: 'b', name: null, picture: null },
+    ] as const
+    const raw = encodeIdentities(sides)
+
+    expect(raw).toBe(
+      '{"type":"identities","players":[{"id":"a","name":"Ana","picture":"https://example.com/a.jpg"},{"id":"b","name":null,"picture":null}]}',
+    )
+    expect(decodeIdentities(raw)).toEqual({
+      type: 'identities',
+      players: [
+        { id: 'a', name: 'Ana', picture: 'https://example.com/a.jpg' },
+        { id: 'b', name: null, picture: null },
+      ],
+    })
+  })
+
+  it('ignores messages that are not verified Match identities', () => {
+    expect(decodeIdentities('not-json')).toBeNull()
+    expect(decodeIdentities('{"type":"identities"}')).toBeNull()
+    expect(
+      decodeIdentities(
+        '{"type":"identities","players":[{"id":"a","name":"Ana"}]}',
+      ),
+    ).toBeNull()
+    expect(decodeIdentities('{"type":"identity","idToken":null}')).toBeNull()
   })
 })

@@ -6,5 +6,9 @@
     "types": ["@cloudflare/workers-types"],
     "verbatimModuleSyntax": false
   },
-  "include": ["worker", "src/match/referee.ts", "src/match/messages.ts"]
+  "include": [
+    "worker",
+    "src/match/referee.ts",
+    "src/match/messages.ts"
+  ]
 }

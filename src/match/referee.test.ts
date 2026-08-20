@@ -37,6 +37,7 @@ describe('Match referee queue', () => {
       outcome: null,
       rematchVotes: [],
       rematchAvailable: true,
+      identities: { a: undefined, b: undefined },
     })
     expect(result.messages).toEqual([
       { to: 'a', type: 'paired', matchId: 'match-1' },
@@ -170,5 +171,117 @@ describe('Match referee live Match', () => {
 
     expect(twice.state.outcome).toEqual(first.state.outcome)
     expect(twice.messages).toEqual([])
+  })
+})
+
+describe('Match referee verified identities', () => {
+  const match = createMatchState('match-1', 'a', 'b')
+
+  it('keeps identity slots unset until both sides report', () => {
+    const result = reduceMatch(match, {
+      type: 'identity',
+      from: 'a',
+      claims: { name: 'Ana', picture: 'https://example.com/a.jpg' },
+    })
+
+    expect(result.state.identities).toEqual({
+      a: { name: 'Ana', picture: 'https://example.com/a.jpg' },
+      b: undefined,
+    })
+    expect(result.messages).toEqual([])
+  })
+
+  it('broadcasts verified identities once both sides report', () => {
+    const one = reduceMatch(match, {
+      type: 'identity',
+      from: 'a',
+      claims: { name: 'Ana', picture: 'https://example.com/a.jpg' },
+    }).state
+    const result = reduceMatch(one, {
+      type: 'identity',
+      from: 'b',
+      claims: null,
+    })
+
+    expect(result.state.identities).toEqual({
+      a: { name: 'Ana', picture: 'https://example.com/a.jpg' },
+      b: null,
+    })
+    expect(result.messages).toEqual([
+      {
+        to: 'a',
+        type: 'identities',
+        players: [
+          { id: 'a', name: 'Ana', picture: 'https://example.com/a.jpg' },
+          { id: 'b', name: null, picture: null },
+        ],
+      },
+      {
+        to: 'b',
+        type: 'identities',
+        players: [
+          { id: 'a', name: 'Ana', picture: 'https://example.com/a.jpg' },
+          { id: 'b', name: null, picture: null },
+        ],
+      },
+    ])
+  })
+
+  it('accepts both anonymous sides', () => {
+    const one = reduceMatch(match, {
+      type: 'identity',
+      from: 'a',
+      claims: null,
+    }).state
+    const result = reduceMatch(one, {
+      type: 'identity',
+      from: 'b',
+      claims: null,
+    })
+
+    expect(result.state.identities).toEqual({ a: null, b: null })
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages[0]).toMatchObject({
+      type: 'identities',
+      players: [
+        { id: 'a', name: null, picture: null },
+        { id: 'b', name: null, picture: null },
+      ],
+    })
+  })
+
+  it('ignores a second identity report from the same participant', () => {
+    const one = reduceMatch(match, {
+      type: 'identity',
+      from: 'a',
+      claims: null,
+    }).state
+    const again = reduceMatch(one, {
+      type: 'identity',
+      from: 'a',
+      claims: { name: 'Spoof', picture: 'https://evil.example/x.png' },
+    })
+
+    expect(again.state.identities).toEqual({ a: null, b: undefined })
+    expect(again.messages).toEqual([])
+  })
+
+  it('keeps identities across Rematch', () => {
+    const identified = reduceMatch(
+      reduceMatch(match, {
+        type: 'identity',
+        from: 'a',
+        claims: { name: 'Ana', picture: 'https://example.com/a.jpg' },
+      }).state,
+      { type: 'identity', from: 'b', claims: null },
+    ).state
+    const ended = reduceMatch(identified, { type: 'death', from: 'a' }).state
+    const rematch = reduceMatch(
+      reduceMatch(ended, { type: 'rematch', from: 'a' }).state,
+      { type: 'rematch', from: 'b' },
+    )
+
+    expect(rematch.state.identities).toEqual(identified.identities)
+    expect(rematch.state.phase).toBe('playing')
   })
 })

@@ -7,16 +7,19 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/parties/*"],
   },
+  "vars": {
+    "GOOGLE_CLIENT_ID": "",
+  },
   "durable_objects": {
     "bindings": [
       { "name": "Queue", "class_name": "Queue" },
-      { "name": "Match", "class_name": "Match" },
-    ],
+      { "name": "Match", "class_name": "Match" }
+    ]
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["Queue", "Match"],
-    },
-  ],
+      "new_sqlite_classes": ["Queue", "Match"]
+    }
+  ]
 }

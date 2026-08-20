@@ -21,13 +21,16 @@ import {
 import gapfallLogoUrl from '../assets/branding/gapfall-logo.png'
 import { VERSUS_FALL_SPEED } from '../game/game-core'
 import {
+  decodeIdentities,
   decodeLinesRemoved,
   decodeOutcome,
   decodeRematchBegin,
   decodeRematchUnavailable,
   encodeDeath,
+  encodeIdentity,
   encodeLinesRemoved,
   encodeRematch,
+  type MatchSideIdentity,
 } from '../match/messages'
 import { GameCanvas } from './GameCanvas'
 import {
@@ -67,6 +70,10 @@ export default function App() {
   const [audioSettings, setAudioSettings] = useState(readAudioSettings)
   const [audio] = useState(() => createGameAudio(readAudioSettings()))
   const matchSocketRef = useRef<PartySocket | null>(null)
+  const [matchIdentities, setMatchIdentities] = useState<
+    readonly [MatchSideIdentity, MatchSideIdentity] | null
+  >(null)
+  const frozenTokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     audio.applySettings(audioSettings)
@@ -108,6 +115,7 @@ export default function App() {
       audio.unsilence()
       sessionRef.current = null
       setHud(null)
+      setMatchIdentities(null)
       matchSocketRef.current?.close()
       matchSocketRef.current = null
     }
@@ -126,12 +134,18 @@ export default function App() {
   useEffect(() => {
     if (shell.mode !== 'matchmaking') return
 
+    frozenTokenRef.current = shell.frozenPlayer?.idToken ?? null
     let match: PartySocket | null = null
     const queue = connectQueue((matchId, playerId) => {
       match?.close()
       match = connectMatch(matchId, playerId)
       match.addEventListener('message', (event) => {
         const raw = String(event.data)
+        const identities = decodeIdentities(raw)
+        if (identities) {
+          setMatchIdentities(identities.players)
+          return
+        }
         const lines = decodeLinesRemoved(raw)
         if (lines) {
           applySentGeneratedLinesRef.current(lines.n)
@@ -161,6 +175,7 @@ export default function App() {
         () => {
           matchSocketRef.current?.close()
           matchSocketRef.current = match
+          match?.send(encodeIdentity(frozenTokenRef.current))
           dispatchRef.current({ type: 'paired' })
         },
         { once: true },
@@ -237,14 +252,22 @@ export default function App() {
         {inRound ? (
           <>
             <header className="game-hud">
-              <div>
-                <p className="eyebrow">Gapfall</p>
-                {versusRound ? null : (
+              {versusRound ? (
+                <div className="versus-identities" aria-label="Versus">
+                  <VersusIdentitySide side={matchIdentities?.[0] ?? null} />
+                  <span className="versus-identities-vs" aria-hidden="true">
+                    vs
+                  </span>
+                  <VersusIdentitySide side={matchIdentities?.[1] ?? null} />
+                </div>
+              ) : (
+                <div>
+                  <p className="eyebrow">Gapfall</p>
                   <h1>
                     Score <span>{hud?.score ?? 0}</span>
                   </h1>
-                )}
-              </div>
+                </div>
+              )}
               {versusRound &&
               !shell.versusOutcome &&
               hud?.phase !== 'game-over' ? (
@@ -252,7 +275,7 @@ export default function App() {
                   type="button"
                   onClick={() => dispatch({ type: 'abandon' })}
                 >
-                  Menu principal
+                  Desistir
                 </button>
               ) : null}
             </header>
@@ -527,6 +550,26 @@ function applyRoundCommand(
   sessionRef.current = result.session
   applyAudioGate(result.audioGate, audio)
   setHud(hudOf(result.session))
+}
+
+function VersusIdentitySide({
+  side,
+}: {
+  side: MatchSideIdentity | null
+}) {
+  const anonymous = !side || side.name === null || side.picture === null
+  const label = anonymous ? 'Oponente' : side.name
+
+  return (
+    <div className="versus-identity">
+      {anonymous ? (
+        <span className="versus-identity-placeholder" aria-hidden="true" />
+      ) : (
+        <img src={side.picture!} alt="" />
+      )}
+      <span>{label}</span>
+    </div>
+  )
 }
 
 function SettingsOverlay({

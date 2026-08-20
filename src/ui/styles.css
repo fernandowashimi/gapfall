@@ -131,6 +131,60 @@ button {
   cursor: pointer;
 }
 
+.versus-identities {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  pointer-events: none;
+}
+
+.versus-identities-vs {
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.versus-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 42%;
+}
+
+.versus-identity img,
+.versus-identity-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.versus-identity img {
+  object-fit: cover;
+  background: #0f172a;
+}
+
+.versus-identity-placeholder {
+  display: inline-block;
+  border: 1px solid rgba(147, 197, 253, 0.45);
+  background:
+    linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.9));
+}
+
+.versus-identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: #dbeafe;
+}
+
 .game-overlay {
   position: absolute;
   z-index: 2;
